@@ -12,6 +12,7 @@ export BUCKET_NAME=thermal-face-training
 export BUCKET=gs://${BUCKET_NAME}
 export MODEL_DIR=${BUCKET}/model
 export DATA_DIR=${BUCKET}/data
+export EXPORT_DIR=${BUCKET}/export
 export LOCATION=us-central1
 export ZONE=${LOCATION}-a
 export VM_NAME=thermal-face-vm
@@ -41,6 +42,7 @@ export BUCKET_NAME=thermal-face-training
 export BUCKET=gs://${BUCKET_NAME}
 export MODEL_DIR=${BUCKET}/model
 export DATA_DIR=${BUCKET}/data
+export EXPORT_DIR=${BUCKET}/export
 export LOCATION=us-central1
 export ZONE=${LOCATION}-a
 export VM_NAME=thermal-face-vm
@@ -56,28 +58,34 @@ ctpu up \
 sudo pip3 install tensorflow-addons tensorflow-model-optimization
 export PYTHONPATH="${PYTHONPATH}:/usr/share/models/"
 
-cd /usr/share/models/official/vision/image_classification/
+cd /usr/share/tpu/models/official/efficientnet/
 
 nohup tensorboard --logdir=${MODEL_DIR} > /dev/null 2>&1 &
 
-# TODO: Start with pretrained model snapshot.
-
-nohup python3 classifier_trainer.py \
-  --mode=train_and_eval \
-  --model_type=efficientnet \
-  --dataset=tdface \
-  --tpu=${VM_NAME} \
+nohup python3 main.py \
+  --tpu_name=${VM_NAME} \
+  --tpu_zone=${ZONE} \
   --data_dir=${DATA_DIR} \
   --model_dir=${MODEL_DIR} \
-  # TODO: Replace with custom config.
-  --config_file=configs/examples/efficientnet/imagenet/efficientnet-b0-tpu.yaml &
+  --export_dir=${EXPORT_DIR} \
+  --model_name=efficientnet-lite4 \
+  --num_label_classes=2 \
+  --augment_name=randaugment \
+  --train_batch_size=2048 \
+  --eval_batch_size=1024 \
+  --train_steps=218949 \  # TODO
+  --num_train_images=1281167 \  # TODO
+  --num_eval_images=50000 \  # TODO
+  --steps_per_eval=6255 \  # TODO
+  &
 
 ctpu delete --name=${VM_NAME} --zone=${ZONE} --tpu-only
 ctpu delete --name=${VM_NAME} --zone=${ZONE}
 ctpu status --zone=${ZONE}
 
 # TODO: Download model snapshot.
-# TODO: Convert to TensorFlow Lite: https://github.com/tensorflow/tpu/tree/master/models/official/efficientnet/lite
+# TODO: Convert model to TensorFlow Lite
+# https://github.com/tensorflow/tpu/tree/master/models/official/efficientnet/lite
 
 gsutil rm -r ${BUCKET}
 ```
