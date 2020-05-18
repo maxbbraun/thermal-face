@@ -22,9 +22,11 @@ gsutil mb -l ${LOCATION} -b on ${BUCKET}
 # TODO: Copy training data into DATA_DIR.
 # https://github.com/maxbbraun/tdface-annotations
 # https://www.lfb.rwth-aachen.de/bibtexupload/pdf/KCZ18d.pdf
+# https://github.com/tensorflow/tpu/blob/master/tools/datasets/imagenet_to_gcs.py
 
 ctpu up \
   --vm-only \
+  --preemptible-vm \  # TODO
   --name=${VM_NAME} \
   --zone=${ZONE} \
   --disk-size-gb=300 \
@@ -50,6 +52,7 @@ export TF_VERSION=2.2
 
 ctpu up \
   --tpu-only \
+  --preemptible \  # TODO
   --name=${VM_NAME} \
   --tpu-size=v3-8  \
   --zone=${ZONE} \
