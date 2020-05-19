@@ -127,3 +127,13 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Visual Studio Code
+.vscode
+
+# Dataset artifacts
+tufts-face-database/
+TD_IR_A_Set*.zip
+TD_IR_E_Set*.zip
+bounding-boxes.csv
+automl.csv
