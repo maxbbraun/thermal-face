@@ -41,7 +41,7 @@ gsutil iam ch allUsers:objectViewer $TDFACE_BUCKET
 
 curl -O https://raw.githubusercontent.com/maxbbraun/tdface-annotations/master/bounding-boxes.csv
 TDFACE_ANNOTATIONS="bounding-boxes.csv"
-TDFACE_AUTOML="tdface-automl.csv"
+TDFACE_AUTOML="automl.csv"
 
 python3 -m venv venv
 . venv/bin/activate
@@ -56,7 +56,7 @@ gsutil cp $TDFACE_AUTOML $TDFACE_BUCKET
 
 Using [Cloud AutoML Vision](https://cloud.google.com/vision/automl/object-detection/docs/quickstart-ui):
 - Model objective: **Object detection**
-- CSV file on Cloud Storage: **`gs://tufts-face-database/tdface-automl.csv`**
+- CSV file on Cloud Storage: **`gs://tufts-face-database/automl.csv`**
 - Model type: **Edge**
 - Optimize for: **Higher accuracy**
 - Node budget: **24 node hours**
