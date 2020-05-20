@@ -6,7 +6,7 @@ Fast face detection in thermal images
 
 ## Inference
 
-> TODO: Create Python package with wrapper around trained model.
+> TODO: Create Python package with wrapper around trained model (Coral supported but optional).
 
 > TODO: Coral setup. https://coral.ai/docs/accelerator/get-started/ (with maximum operating frequency)
 
@@ -20,14 +20,17 @@ Fast face detection in thermal images
 
 > TODO: Add non-thermal face database (biasing toward thermal in validation and test sets).
 
-> TODO: Explain steps.
-
 ```bash
 cd training
+```
 
+Download the thermal images from the [Tufts Face Database](http://tdface.ece.tufts.edu) and upload them to [Cloud Storage](https://cloud.google.com/storage/docs):
+
+```bash
 LOCATION="us-central1"
 TDFACE_DIR="tufts-face-database"
 TDFACE_BUCKET="gs://$TDFACE_DIR"
+MODEL_BUCKET="gs://thermal-face"
 
 for i in $(seq 1 4)
 do
@@ -43,8 +46,12 @@ done
 
 gsutil mb -l $LOCATION $TDFACE_BUCKET
 gsutil -m rsync -r $TDFACE_DIR $TDFACE_BUCKET
-gsutil iam ch allUsers:objectViewer $TDFACE_BUCKET
+gsutil mb -l $LOCATION $MODEL_BUCKET
+```
 
+Create a dataset index in the [AutoML format](https://cloud.google.com/vision/automl/object-detection/docs/csv-format) using the matching [bounding box annotations](https://github.com/maxbbraun/tdface-annotations):
+
+```bash
 curl -O https://raw.githubusercontent.com/maxbbraun/tdface-annotations/master/bounding-boxes.csv
 TDFACE_ANNOTATIONS="bounding-boxes.csv"
 TDFACE_AUTOML="automl.csv"
@@ -55,16 +62,32 @@ pip3 install -r requirements.txt
 
 python automl_convert.py --tdface_dir=$TDFACE_DIR --tdface_bucket=$TDFACE_BUCKET --tdface_annotations=$TDFACE_ANNOTATIONS --tdface_automl=$TDFACE_AUTOML
 
-gsutil cp $TDFACE_AUTOML $TDFACE_BUCKET
+gsutil cp $TDFACE_AUTOML $MODEL_BUCKET
 ```
 
 #### 2. Train the model
 
-Using [Cloud AutoML Vision](https://cloud.google.com/vision/automl/object-detection/docs/quickstart-ui):
+Using [Cloud AutoML Vision](https://cloud.google.com/vision/automl/object-detection/docs/edge-quickstart):
 - Model objective: **Object detection**
-- CSV file on Cloud Storage: **`gs://tufts-face-database/automl.csv`**
+- CSV file on Cloud Storage: **`$MODEL_BUCKET/automl.csv`**
 - Model type: **Edge**
-- Optimize for: **Higher accuracy**
+- Optimize for: **Faster predictions**
 - Node budget: **24 node hours**
+- Use model: **TF Lite**
+- Export to Cloud Storage: **`$MODEL_BUCKET/`**
 
-> TODO: Add steps for model export.
+#### 3. Compile the model
+
+Compile the model for [Edge TPU](https://coral.ai/products/):
+
+```bash
+MODEL_FILE="thermal_face_automl_edge_l.tflite"
+TPU_MODEL_FILE="${MODEL_FILE%.*}_edgetpu.${MODEL_FILE##*.}"
+gsutil cp $MODEL_BUCKET/**/model.tflite $MODEL_FILE
+
+docker build -t edgetpu_compiler --build-arg MODEL_FILE=$MODEL_FILE .
+docker run edgetpu_compiler
+docker cp $(docker ps -alq):/$TPU_MODEL_FILE .
+mv $MODEL_FILE ../
+mv $TPU_MODEL_FILE ../
+```
