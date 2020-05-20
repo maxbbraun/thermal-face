@@ -78,7 +78,7 @@ Using [Cloud AutoML Vision](https://cloud.google.com/vision/automl/object-detect
 
 #### 3. Compile the model
 
-Compile the model for [Edge TPU](https://coral.ai/products/):
+Use [Docker](https://docs.docker.com) to compile the model for [Edge TPU](https://coral.ai/products/):
 
 ```bash
 MODEL_FILE="thermal_face_automl_edge_l.tflite"
@@ -88,6 +88,7 @@ gsutil cp $MODEL_BUCKET/**/model.tflite $MODEL_FILE
 docker build -t edgetpu_compiler --build-arg MODEL_FILE=$MODEL_FILE .
 docker run edgetpu_compiler
 docker cp $(docker ps -alq):/$TPU_MODEL_FILE .
+
 mv $MODEL_FILE ../
 mv $TPU_MODEL_FILE ../
 ```
