@@ -6,11 +6,36 @@ Fast face detection in thermal images
 
 ## Inference
 
-> TODO: Create Python package with wrapper around trained model (Coral supported but optional).
+Face detection is optimized for edge devices such as [Coral](https://coral.ai/docs/accelerator/get-started/).
 
-> TODO: Coral setup. https://coral.ai/docs/accelerator/get-started/ (with maximum operating frequency)
+Inference from Python can be done manually using the [TF Lite API](https://www.tensorflow.org/lite/guide/python) or more easily using the [Edge TPU API](https://coral.ai/docs/edgetpu/api-intro/):
 
-> TODO: Add note about performance.
+```bash
+pip3 install Pillow
+sudo apt-get install python3-edgetpu
+```
+
+```python
+from edgetpu.detection.engine import DetectionEngine
+from PIL import Image
+
+# One-time initialization:
+face_detector = DetectionEngine('thermal_face_automl_edge_l_edgetpu.tflite')
+
+# Per-image detection:
+image = Image.open('image.png').convert('RGB')
+faces = face_detector.detect_with_image(image,
+                                        threshold=0.1,
+                                        keep_aspect_ratio=True,
+                                        relative_coord=False,
+                                        top_k=10)
+for face in faces:
+  print(face.bounding_box)  # np.array([[x1, y1], [x2, y2]], dtype=float64)
+```
+
+> TODO: Profile image conversions. Reduce allocations with more buffers?
+
+> TODO: Add note about performance results. Mention Coral maximum operating frequency.
 
 ## Training
 
@@ -19,6 +44,10 @@ Fast face detection in thermal images
 #### 1. Create the dataset
 
 > TODO: Add non-thermal face database (biasing toward thermal in validation and test sets).
+> WIDER_train.zip https://drive.google.com/uc?export=download&id=0B6eKvaijfFUDQUUwd21EckhUbWs
+> WIDER_val.zip https://drive.google.com/uc?export=download&id=0B6eKvaijfFUDd3dIRmpvSk8tLUk
+> WIDER_test.zip https://drive.google.com/uc?export=download&id=0B6eKvaijfFUDbW4tdGpaYjgzZkU
+> http://mmlab.ie.cuhk.edu.hk/projects/WIDERFace/support/bbx_annotation/wider_face_split.zip
 
 Download the thermal images from the [Tufts Face Database](http://tdface.ece.tufts.edu) and upload them to [Cloud Storage](https://cloud.google.com/storage/docs):
 
@@ -101,3 +130,5 @@ docker cp $(docker ps -alq):/$TPU_MODEL_FILE .
 mv $MODEL_FILE ../
 mv $TPU_MODEL_FILE ../
 ```
+
+> TODO: Debug issues with edgetpu-compiled model.
