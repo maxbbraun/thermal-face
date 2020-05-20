@@ -1,12 +1,16 @@
-# ThermalFace
+# Thermal Face
 
-Face detection in thermal images
+Fast face detection in thermal images
 
 > TODO: Write summary (referencing [Fever](https://github.com/maxbbraun/fever)).
 
 ## Inference
 
 > TODO: Create Python package with wrapper around trained model.
+
+> TODO: Coral setup. https://coral.ai/docs/accelerator/get-started/ (with maximum operating frequency)
+
+> TODO: Add note about performance.
 
 ## Training
 
@@ -19,6 +23,8 @@ Face detection in thermal images
 > TODO: Explain steps.
 
 ```bash
+cd training
+
 LOCATION="us-central1"
 TDFACE_DIR="tufts-face-database"
 TDFACE_BUCKET="gs://$TDFACE_DIR"
