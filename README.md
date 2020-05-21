@@ -43,8 +43,6 @@ You can also use the [TF Lite API](https://www.tensorflow.org/lite/guide/python)
 
 #### 1. Create the dataset
 
-> TODO: Add non-thermal face database (biasing toward thermal in validation and test sets): [WIDER_train.zip](https://drive.google.com/uc?export=download&id=0B6eKvaijfFUDQUUwd21EckhUbWs), [WIDER_val.zip](https://drive.google.com/uc?export=download&id=0B6eKvaijfFUDd3dIRmpvSk8tLUk), [WIDER_test.zip](https://drive.google.com/uc?export=download&id=0B6eKvaijfFUDbW4tdGpaYjgzZkU), [wider_face_split.zip](http://mmlab.ie.cuhk.edu.hk/projects/WIDERFace/support/bbx_annotation/wider_face_split.zip)
-
 Download the thermal images from the [Tufts Face Database](http://tdface.ece.tufts.edu) and upload them to [Cloud Storage](https://cloud.google.com/storage/docs):
 
 ```bash
@@ -53,7 +51,6 @@ cd training
 LOCATION="us-central1"
 TDFACE_DIR="tufts-face-database"
 TDFACE_BUCKET="gs://$TDFACE_DIR"
-MODEL_BUCKET="gs://thermal-face"
 
 for i in $(seq 1 4)
 do
@@ -69,47 +66,91 @@ done
 
 gsutil mb -l $LOCATION $TDFACE_BUCKET
 gsutil -m rsync -r $TDFACE_DIR $TDFACE_BUCKET
-gsutil mb -l $LOCATION $MODEL_BUCKET
 ```
 
-Create a dataset spec in the [AutoML format](https://cloud.google.com/vision/automl/object-detection/docs/csv-format) using the matching [bounding box annotations](https://github.com/maxbbraun/tdface-annotations):
+Create a dataset spec of the thermal images in the [AutoML format](https://cloud.google.com/vision/automl/object-detection/docs/csv-format) using the matching [bounding box annotations](https://github.com/maxbbraun/tdface-annotations):
 
 ```bash
 curl -O https://raw.githubusercontent.com/maxbbraun/tdface-annotations/master/bounding-boxes.csv
 TDFACE_ANNOTATIONS="bounding-boxes.csv"
-AUTOML_SPEC="automl.csv"
+TDFACE_AUTOML="tdface-automl.csv"
 
 python3 -m venv venv
 . venv/bin/activate
 pip3 install -r requirements.txt
 
 python automl_convert.py \
+  --mode=TDFACE \
   --tdface_dir=$TDFACE_DIR \
   --tdface_bucket=$TDFACE_BUCKET \
   --tdface_annotations=$TDFACE_ANNOTATIONS \
-  --tdface_automl=$AUTOML_SPEC
-
-gsutil cp $AUTOML_SPEC $MODEL_BUCKET
+  --automl_out=$TDFACE_AUTOML
 ```
+
+Download the [WIDER FACE](http://shuoyang1213.me/WIDERFACE/) dataset:
+ - [WIDER_train.zip](https://drive.google.com/uc?export=download&id=0B6eKvaijfFUDQUUwd21EckhUbWs)
+ - [WIDER_val.zip](https://drive.google.com/uc?export=download&id=0B6eKvaijfFUDd3dIRmpvSk8tLUk)
+ - [WIDER_test.zip](https://drive.google.com/uc?export=download&id=0B6eKvaijfFUDbW4tdGpaYjgzZkU)
+ - [wider_face_split.zip](http://mmlab.ie.cuhk.edu.hk/projects/WIDERFace/support/bbx_annotation/wider_face_split.zip)
+
+```bash
+WIDERFACE_DIR="wider-face-database"
+WIDERFACE_BUCKET="gs://$WIDERFACE_DIR"
+
+mkdir $WIDERFACE_DIR
+for f in WIDER_*.zip wider_*.zip
+do
+  unzip $f -d $WIDERFACE_DIR/
+done
+
+gsutil mb -l $LOCATION $WIDERFACE_BUCKET
+gsutil -m rsync -r $WIDERFACE_DIR $WIDERFACE_BUCKET
+```
+
+ > TODO: Explain this step.
+
+```bash
+WIDERFACE_TRAINING_AUTOML="widerface-training-automl.csv"
+WIDERFACE_VALIDATION_AUTOML="widerface-validation-automl.csv"
+
+python automl_convert.py \
+  --mode=WIDERFACE \
+  --widerface_dir=$WIDERFACE_DIR/WIDER_train \
+  --widerface_bucket=$WIDERFACE_BUCKET/WIDER_train \
+  --widerface_annotations=$WIDERFACE_DIR/wider_face_split/wider_face_train_bbx_gt.txt \
+  --automl_out=$WIDERFACE_TRAINING_AUTOML
+python automl_convert.py \
+  --mode=WIDERFACE \
+  --widerface_dir=$WIDERFACE_DIR/WIDER_val \
+  --widerface_bucket=$WIDERFACE_BUCKET/WIDER_val \
+  --widerface_annotations=$WIDERFACE_DIR/wider_face_split/wider_face_val_bbx_gt.txt \
+  --automl_out=$WIDERFACE_VALIDATION_AUTOML
+```
+
+> TODO: Merge all CSVs into one `$AUTOML_SPEC` with the right TRAIN/VALIDATE/TEST mix.
+
+> TODO: Totals - TDFACE 1,557 - WIDERFACE train 157,025 - WIDERFACE val 39,123
 
 #### 2. Train the model
 
 ```bash
-MODEL_NAME="thermal_face_automl_edge_l"
+MODEL_BUCKET="gs://thermal-face"
+MODEL_NAME="thermal_face_automl_edge_fast"
+
+gsutil mb -l $LOCATION $MODEL_BUCKET
+gsutil cp $AUTOML_SPEC $MODEL_BUCKET
 ```
 
-Using [Cloud AutoML Vision](https://cloud.google.com/vision/automl/object-detection/docs/edge-quickstart):
+Use [Cloud AutoML Vision](https://cloud.google.com/vision/automl/object-detection/docs/edge-quickstart) with the following options:
 
-> TODO: Try optimizing for best trade-off instead.
-
- - Model objective: **Object detection**
- - CSV file on Cloud Storage: **`$MODEL_BUCKET/$AUTOML_SPEC`**
- - Model name: **`$MODEL_NAME`**
- - Model type: **Edge**
- - Optimize for: **Higher accuracy**
- - Node budget: **24 node hours**
- - Use model: **TF Lite**
- - Export to Cloud Storage: **`$MODEL_BUCKET/`**
+- Model objective: **Object detection**
+- CSV file on Cloud Storage: **`$MODEL_BUCKET/$AUTOML_SPEC`**
+- Model name: **`$MODEL_NAME`**
+- Model type: **Edge**
+- Optimize for: **Faster predictions**
+- Node budget: **24 node hours**
+- Use model: **TF Lite**
+- Export to Cloud Storage: **`$MODEL_BUCKET/`**
 
 #### 3. Compile the model
 

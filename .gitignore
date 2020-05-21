@@ -132,7 +132,10 @@ dmypy.json
 .vscode
 
 # Dataset artifacts
-training/tufts-face-database/
 training/TD_IR_*_Set*.zip
+training/tufts-face-database/
+training/WIDER*.zip
+training/wider*.zip
+training/wider-face-database/
 training/*.csv
 models/*.log
