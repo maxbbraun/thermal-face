@@ -1,14 +1,12 @@
 # Thermal Face
 
-Fast face detection in thermal images
-
-> TODO: Write summary (referencing [Fever](https://github.com/maxbbraun/fever)).
+**Thermal Face** is a machine learning model for fast face detection in thermal images. It was built for [**Fever**](https://github.com/maxbbraun/fever), the contactless fever thermometer with auto-aim.
 
 ## Inference
 
-Face detection is optimized for edge devices such as [Coral](https://coral.ai/docs/accelerator/get-started/).
+The face detection model is using [TensorFlow Lite](https://www.tensorflow.org/lite) for optimal performance on mobile/edge devices. The recommended inference setup is a [Raspberry Pi 4 Model B](https://www.raspberrypi.org/products/raspberry-pi-4-model-b/) with a [Coral USB Accelerator](https://coral.ai/docs/accelerator/get-started/).
 
-Inference from Python can be done manually using the [TF Lite API](https://www.tensorflow.org/lite/guide/python) or more easily using the [Edge TPU API](https://coral.ai/docs/edgetpu/api-intro/):
+The following is an example for inference from Python on an image file using the compiled model [`thermal_face_automl_edge_l_edgetpu.tflite`](thermal_face_automl_edge_l_edgetpu.tflite) and the [Edge TPU API](https://coral.ai/docs/edgetpu/api-intro/):
 
 ```bash
 pip3 install Pillow
@@ -25,29 +23,27 @@ face_detector = DetectionEngine('thermal_face_automl_edge_l_edgetpu.tflite')
 # Per-image detection:
 image = Image.open('image.png').convert('RGB')
 faces = face_detector.detect_with_image(image,
-                                        threshold=0.1,
-                                        keep_aspect_ratio=True,
-                                        relative_coord=False,
-                                        top_k=10)
+    threshold=0.5
+    top_k=10,
+    keep_aspect_ratio=True,
+    relative_coord=False,
+    resample=Image.BILINEAR)
 for face in faces:
-  print(face.bounding_box)  # np.array([[x1, y1], [x2, y2]], dtype=float64)
+  # np.array([[left, top], [right, bottom]], dtype=float64)
+  face.bounding_box
 ```
 
-> TODO: Profile image conversions. Reduce allocations with more buffers?
+You can also use the [TF Lite API](https://www.tensorflow.org/lite/guide/python) directly on the compiled model or, in the absence of a Edge TPU, on the uncompiled model [`thermal_face_automl_edge_l.tflite`](thermal_face_automl_edge_l.tflite).
 
-> TODO: Add note about performance results. Mention Coral maximum operating frequency.
+> TODO: Add a note about expected performance numbers. Mention Coral maximum operating frequency. Profile inference alone vs. image conversion etc. Try Raspberry Pi overclocking.
 
 ## Training
 
-> TODO: Write intro.
+> TODO: Explain strategy for dataset and training.
 
 #### 1. Create the dataset
 
-> TODO: Add non-thermal face database (biasing toward thermal in validation and test sets).
-> WIDER_train.zip https://drive.google.com/uc?export=download&id=0B6eKvaijfFUDQUUwd21EckhUbWs
-> WIDER_val.zip https://drive.google.com/uc?export=download&id=0B6eKvaijfFUDd3dIRmpvSk8tLUk
-> WIDER_test.zip https://drive.google.com/uc?export=download&id=0B6eKvaijfFUDbW4tdGpaYjgzZkU
-> http://mmlab.ie.cuhk.edu.hk/projects/WIDERFace/support/bbx_annotation/wider_face_split.zip
+> TODO: Add non-thermal face database (biasing toward thermal in validation and test sets): [WIDER_train.zip](https://drive.google.com/uc?export=download&id=0B6eKvaijfFUDQUUwd21EckhUbWs), [WIDER_val.zip](https://drive.google.com/uc?export=download&id=0B6eKvaijfFUDd3dIRmpvSk8tLUk), [WIDER_test.zip](https://drive.google.com/uc?export=download&id=0B6eKvaijfFUDbW4tdGpaYjgzZkU), [wider_face_split.zip](http://mmlab.ie.cuhk.edu.hk/projects/WIDERFace/support/bbx_annotation/wider_face_split.zip)
 
 Download the thermal images from the [Tufts Face Database](http://tdface.ece.tufts.edu) and upload them to [Cloud Storage](https://cloud.google.com/storage/docs):
 
@@ -104,6 +100,8 @@ MODEL_NAME="thermal_face_automl_edge_l"
 
 Using [Cloud AutoML Vision](https://cloud.google.com/vision/automl/object-detection/docs/edge-quickstart):
 
+> TODO: Try optimizing for best trade-off instead.
+
  - Model objective: **Object detection**
  - CSV file on Cloud Storage: **`$MODEL_BUCKET/$AUTOML_SPEC`**
  - Model name: **`$MODEL_NAME`**
@@ -114,6 +112,8 @@ Using [Cloud AutoML Vision](https://cloud.google.com/vision/automl/object-detect
  - Export to Cloud Storage: **`$MODEL_BUCKET/`**
 
 #### 3. Compile the model
+
+> TODO: Fix issues with TPU-compiled model.
 
 Use [Docker](https://docs.docker.com) to compile the model for [Edge TPU](https://coral.ai/products/):
 
@@ -130,5 +130,3 @@ docker cp $(docker ps -alq):/$TPU_MODEL_FILE .
 mv $MODEL_FILE ../
 mv $TPU_MODEL_FILE ../
 ```
-
-> TODO: Debug issues with edgetpu-compiled model.
