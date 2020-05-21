@@ -6,7 +6,7 @@
 
 The face detection model is using [TensorFlow Lite](https://www.tensorflow.org/lite) for optimal performance on mobile/edge devices. The recommended inference setup is a [Raspberry Pi 4 Model B](https://www.raspberrypi.org/products/raspberry-pi-4-model-b/) with a [Coral USB Accelerator](https://coral.ai/docs/accelerator/get-started/).
 
-The following is an example for inference from Python on an image file using the compiled model [`thermal_face_automl_edge_l_edgetpu.tflite`](thermal_face_automl_edge_l_edgetpu.tflite) and the [Edge TPU API](https://coral.ai/docs/edgetpu/api-intro/):
+The following is an example for inference from Python on an image file using the compiled model [`thermal_face_automl_edge_l_edgetpu.tflite`](models/thermal_face_automl_edge_l_edgetpu.tflite) and the [Edge TPU API](https://coral.ai/docs/edgetpu/api-intro/):
 
 ```bash
 pip3 install Pillow
@@ -33,7 +33,7 @@ for face in faces:
   face.bounding_box
 ```
 
-You can also use the [TF Lite API](https://www.tensorflow.org/lite/guide/python) directly on the compiled model or, in the absence of a Edge TPU, on the uncompiled model [`thermal_face_automl_edge_l.tflite`](thermal_face_automl_edge_l.tflite).
+You can also use the [TF Lite API](https://www.tensorflow.org/lite/guide/python) directly on the compiled model or, in the absence of a Edge TPU, on the uncompiled model [`thermal_face_automl_edge_l.tflite`](models/thermal_face_automl_edge_l.tflite).
 
 > TODO: Add a note about expected performance numbers. Mention Coral maximum operating frequency. Profile inference alone vs. image conversion etc. Try Raspberry Pi overclocking.
 
@@ -132,6 +132,6 @@ docker build \
 docker run $COMPILER_NAME
 docker cp $(docker ps -alq):/$TPU_MODEL_FILE .
 
-mv $MODEL_FILE ../
-mv $TPU_MODEL_FILE ../
+mv $MODEL_FILE ../models/
+mv $TPU_MODEL_FILE ../models/
 ```
