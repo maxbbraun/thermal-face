@@ -63,10 +63,7 @@ def main(_):
         elif FLAGS.mode == 'WIDERFACE':
             # Input format: http://shuoyang1213.me/WIDERFACE/
             with open(FLAGS.widerface_annotations) as input_file:
-                local_path = None
-                image = None
-                gcs_path = None
-                for _, line in tqdm(enumerate(input_file)):
+                for count, line in tqdm(enumerate(input_file)):
                     image_filename_match = IMAGE_FILENAME_PATTERN.match(line)
                     num_faces_match = NUM_FACES_PATTERN.match(line)
                     face_pattern_match = FACE_PATTERN.match(line)
@@ -77,10 +74,15 @@ def main(_):
                         image = Image.open(local_path)
                         gcs_path = path.join(FLAGS.widerface_bucket, 'images',
                                              image_filename)
+                        image_line_count = count
                     elif num_faces_match:
-                        # Not needed.
-                        pass
+                        assert count == image_line_count + 1
+                        num_faces = int(num_faces_match.group(1))
                     elif face_pattern_match:
+                        if not num_faces:
+                            # Empty bounding box after 0 face count.
+                            continue
+                        assert count <= image_line_count + 1 + num_faces
                         if face_pattern_match.group(8) == '1':
                             # Invalid bounding box.
                             continue

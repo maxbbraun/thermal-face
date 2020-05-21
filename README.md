@@ -129,7 +129,7 @@ python automl_convert.py \
 
 > TODO: Merge all CSVs into one `$AUTOML_SPEC` with the right TRAIN/VALIDATE/TEST mix.
 
-> TODO: Totals - TDFACE 1,557 - WIDERFACE train 157,025 - WIDERFACE val 39,123
+> TODO: Totals - TDFACE 1,557 - WIDERFACE train 157,021 - WIDERFACE val 39,123
 
 #### 2. Train the model
 
