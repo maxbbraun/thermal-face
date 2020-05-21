@@ -133,7 +133,6 @@ dmypy.json
 
 # Dataset artifacts
 training/tufts-face-database/
-training/TD_IR_A_Set*.zip
-training/TD_IR_E_Set*.zip
-training/bounding-boxes.csv
-training/automl.csv
+training/TD_IR_*_Set*.zip
+training/*.csv
+models/*.log

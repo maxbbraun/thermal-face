@@ -120,18 +120,20 @@ Use [Docker](https://docs.docker.com) to compile the model for [Edge TPU](https:
 ```bash
 MODEL_FILE="$MODEL_NAME.tflite"
 TPU_MODEL_FILE="${MODEL_FILE%.*}_edgetpu.${MODEL_FILE##*.}"
-COMPILER_NAME="edgetpu_compiler"
+MODEL_DIR="$(pwd)/../models"
+COMPILER_NAME="compiler"
+OUT_DIR="/out"
 
 gsutil cp $MODEL_BUCKET/**/*$MODEL_NAME*/model.tflite $MODEL_FILE
 
-docker build \
+docker build . \
   --file $COMPILER_NAME.Dockerfile \
   --tag $COMPILER_NAME \
   --build-arg MODEL_FILE=$MODEL_FILE \
-  .
-docker run $COMPILER_NAME
-docker cp $(docker ps -alq):/$TPU_MODEL_FILE .
-
-mv $MODEL_FILE ../models/
-mv $TPU_MODEL_FILE ../models/
+  --build-arg OUT_DIR=$OUT_DIR
+docker run \
+  --mount type=bind,source=$MODEL_DIR,target=$OUT_DIR \
+  --rm \
+  $COMPILER_NAME
+mv $MODEL_FILE $MODEL_DIR/
 ```
