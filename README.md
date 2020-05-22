@@ -35,15 +35,13 @@ for face in faces:
 
 You can also use the [TF Lite API](https://www.tensorflow.org/lite/guide/python) directly on the compiled model or, in the absence of a Edge TPU, on the uncompiled model [`thermal_face_automl_edge_fast.tflite`](models/thermal_face_automl_edge_fast.tflite).
 
-> TODO: Add a note about expected performance numbers. Mention Coral maximum operating frequency. Profile inference alone vs. image conversion etc. Try Raspberry Pi overclocking.
-
 ## Training
 
 The model is trained with [Cloud AutoML](https://cloud.google.com/automl) using a face dataset that combines a large set of images in visible light from the [WIDER FACE](http://shuoyang1213.me/WIDERFACE/) database and a smaller set of thermal images from the [Tufts Face Database](http://tdface.ece.tufts.edu).
 
 ### 1. Create the dataset
 
-There are a total of 77,881 face bounding boxes in the combined dataset. The WIDER FACE set is large and diverse, but only contains visible light images. The thermal images from the Tufts Face Database are fewer and less diverse, so we mix the two sets before splitting them into [training, validation, and test sets](https://cloud.google.com/vision/automl/object-detection/docs/prepare). The relative size of the test and validation sets are unusually small to achieve a better balance among the source datasets while still using all available training data.
+There are a total of 77,881 face bounding boxes in the combined dataset. The WIDER FACE set is large and diverse, but only contains visible-light images. The thermal images from the Tufts Face Database are fewer and less diverse, so we mix the two sets before splitting them into [training, validation, and test sets](https://cloud.google.com/vision/automl/object-detection/docs/prepare). The relative size of the test and validation sets are unusually small to achieve a better balance among the source datasets while still using all available training data.
 
 WIDER FACE happens to come in two separate validation and training sets, which we treat as one source set. The exact breakdown is a follows:
 
@@ -195,7 +193,7 @@ Use [Cloud AutoML Vision](https://cloud.google.com/vision/automl/object-detectio
 
 ### 3. Compile the model
 
-> TODO: Fix issues with TPU-compiled model.
+⚠️ ***See [open issue](https://github.com/maxbbraun/thermal-face/issues/2).***
 
 Use [Docker](https://docs.docker.com) to compile the model for [Edge TPU](https://coral.ai/products/):
 
