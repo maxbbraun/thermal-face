@@ -88,7 +88,7 @@ gsutil mb -l $LOCATION $TDFACE_BUCKET
 gsutil -m rsync -r $TDFACE_DIR $TDFACE_BUCKET
 ```
 
-Create a dataset spec of the thermal images in the [AutoML format](https://cloud.google.com/vision/automl/object-detection/docs/csv-format) using the separate [bounding box annotations](https://github.com/maxbbraun/tdface-annotations) and upload it:
+Create a dataset spec of the images in the [AutoML format](https://cloud.google.com/vision/automl/object-detection/docs/csv-format) using the [separately created](https://github.com/maxbbraun/tdface-annotations) bounding box annotations and upload it:
 
 ```bash
 curl -O https://raw.githubusercontent.com/maxbbraun/tdface-annotations/master/bounding-boxes.csv
@@ -167,7 +167,7 @@ Combine all AutoML dataset specs into one and upload it:
 ```bash
 THERMAL_FACE_AUTOML="automl.csv"
 
-rm $THERMAL_FACE_AUTOML
+rm -f $THERMAL_FACE_AUTOML
 cat $TDFACE_AUTOML >> $THERMAL_FACE_AUTOML
 cat $WIDERFACE_TRAINING_AUTOML >> $THERMAL_FACE_AUTOML
 cat $WIDERFACE_VALIDATION_AUTOML >> $THERMAL_FACE_AUTOML
