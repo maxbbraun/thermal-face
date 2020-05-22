@@ -4,6 +4,7 @@ from absl import logging
 import csv
 from os import path
 from PIL import Image
+import random
 import re
 from tqdm import tqdm
 
@@ -26,9 +27,20 @@ flags.DEFINE_string('widerface_bucket', 'gs://wider-face', 'The Cloud Storage '
 flags.DEFINE_string('widerface_annotations', 'wider_face_bbx_gt.txt', 'The '
                     'input CSV file with bounding boxes for the WIDER FACE '
                     'database images.')
+flags.DEFINE_integer('min_box_size', 20, 'The minimum size in pixels for a '
+                     'bounding box not to get discarded.')
+flags.DEFINE_float('validation_fraction', 0.1, 'The randomly selected '
+                   'fraction of total annotations (not images) to be assigned '
+                   'to the validation set. Anything not assigned to either '
+                   'the validation set or the test set will be assigned to '
+                   'the training set.')
+flags.DEFINE_float('test_fraction', 0.1, 'The randomly selected fraction of '
+                   'total annotations (not images) to be assigned to the '
+                   'validation set. Anything not assigned to either the '
+                   'validation set or the test set will be assigned to the '
+                   'training set.')
 flags.DEFINE_string('automl_out', 'automl.csv', 'The output CSV file for '
                     'Cloud AutoML Vision.')
-# TODO: Add flags for TRAIN/VALIDATE/TEST split fractions.
 
 # The regular expression patterns for parsing WIDER FACE annotations.
 IMAGE_FILENAME_PATTERN = re.compile(r'^(\d+--.+\.jpg)$')
@@ -37,36 +49,100 @@ FACE_PATTERN = re.compile(r'^(\d+) (\d+) (\d+) (\d+) (\d+) (\d+) (\d+) (\d+) '
                           r'(\d+) (\d+) $')
 
 # The CSV pattern for the AutoML output file.
-AUTOML_PATTERN = 'UNASSIGNED,%s,face,%.4f,%.4f,,,%.4f,%.4f,,\n'
+AUTOML_PATTERN = '%s,%s,face,%.4f,%.4f,,,%.4f,%.4f,,\n'
+
+
+def random_split(dataset):
+    dataset = set(dataset)
+
+    # Translate the fractions into counts.
+    validation_count = int(FLAGS.validation_fraction * len(dataset))
+    test_count = int(FLAGS.test_fraction * len(dataset))
+
+    # Randomly sample from the dataset and then from the remaining set.
+    validation_set = set(random.sample(dataset, validation_count))
+    test_set = set(random.sample(dataset - validation_set, test_count))
+
+    return validation_set, test_set
+
+
+def split_label(data, validation_set, test_set):
+    if data in validation_set:
+        return 'VALIDATE'
+    elif data in test_set:
+        return 'TEST'
+    else:
+        return 'TRAIN'
+
+
+def convert_bounding_box(left_str, top_str, width_str, height_str, image_width,
+                         image_height):
+    left = int(left_str)
+    top = int(top_str)
+    right = left + int(width_str)
+    bottom = top + int(height_str)
+
+    # Clip to the image size.
+    left, right = map(lambda x: max(0, min(image_width - 1, x)), [left, right])
+    top, bottom = map(lambda y: max(0, min(image_height - 1, y)),
+                      [top, bottom])
+
+    # Convert to relative coordinates.
+    relative_left = round(left / image_width, 4)
+    relative_top = round(top / image_height, 4)
+    relative_right = round(right / image_width, 4)
+    relative_bottom = round(bottom / image_height, 4)
+
+    # Discard small boxes.
+    rounded_width = int((relative_right - relative_left) * image_width)
+    rounded_height = int((relative_bottom - relative_top) * image_height)
+    if (rounded_width < FLAGS.min_box_size or
+            rounded_height < FLAGS.min_box_size):
+        return None
+
+    return relative_left, relative_top, relative_right, relative_bottom
 
 
 def main(_):
     # Output format:
     # https://cloud.google.com/vision/automl/object-detection/docs/csv-format
     with open(FLAGS.automl_out, 'w') as output_file:
+
         if FLAGS.mode == 'TDFACE':
             # Input format: https://github.com/maxbbraun/tdface-annotations
             with open(FLAGS.tdface_annotations, newline='') as input_file:
                 reader = csv.reader(input_file)
                 next(reader)  # Skip header.
+                dataset = []
+
+                logging.info('Parsing TDFACE annotations.')
                 for row in tqdm(reader):
                     local_path = path.join(FLAGS.tdface_dir, *row[:3])
                     gcs_path = path.join(FLAGS.tdface_bucket, *row[:3])
                     image = Image.open(local_path)
-                    left = int(row[3])
-                    top = int(row[4])
-                    right = (int(row[3]) + int(row[5]))
-                    bottom = (int(row[4]) + int(row[6]))
-                    output_file.write(AUTOML_PATTERN % (
-                        gcs_path, left / image.width, top / image.height,
-                        right / image.width, bottom / image.height))
+                    bounding_box = convert_bounding_box(*row[3:7], image.width,
+                                                        image.height)
+                    if bounding_box:
+                        dataset.append((gcs_path, *bounding_box))
+
+                validation_set, test_set = random_split(dataset)
+
+                logging.info('Writing TDFACE output.')
+                for data in tqdm(dataset):
+                    split = split_label(data, validation_set, test_set)
+                    output_file.write(AUTOML_PATTERN % (split, *data))
+
         elif FLAGS.mode == 'WIDERFACE':
             # Input format: http://shuoyang1213.me/WIDERFACE/
             with open(FLAGS.widerface_annotations) as input_file:
+                dataset = []
+
+                logging.info('Parsing WIDERFACE annotations.')
                 for count, line in tqdm(enumerate(input_file)):
                     image_filename_match = IMAGE_FILENAME_PATTERN.match(line)
                     num_faces_match = NUM_FACES_PATTERN.match(line)
                     face_pattern_match = FACE_PATTERN.match(line)
+
                     if image_filename_match:
                         image_filename = image_filename_match.group(1)
                         local_path = path.join(FLAGS.widerface_dir, 'images',
@@ -75,28 +151,44 @@ def main(_):
                         gcs_path = path.join(FLAGS.widerface_bucket, 'images',
                                              image_filename)
                         image_line_count = count
+
                     elif num_faces_match:
                         assert count == image_line_count + 1
                         num_faces = int(num_faces_match.group(1))
+
                     elif face_pattern_match:
                         if not num_faces:
                             # Empty bounding box after 0 face count.
                             continue
+
                         assert count <= image_line_count + 1 + num_faces
+
                         if face_pattern_match.group(8) == '1':
                             # Invalid bounding box.
                             continue
+
                         left = int(face_pattern_match.group(1))
                         top = int(face_pattern_match.group(2))
                         width = int(face_pattern_match.group(3))
                         height = int(face_pattern_match.group(4))
                         right = (left + width)
                         bottom = (top + height)
-                        output_file.write(AUTOML_PATTERN % (
-                            gcs_path, left / image.width, top / image.height,
-                            right / image.width, bottom / image.height))
+
+                        bounding_box = convert_bounding_box(
+                            *face_pattern_match.groups()[:4], image.width,
+                            image.height)
+                        if bounding_box:
+                            dataset.append((gcs_path, *bounding_box))
+
                     else:
                         raise ValueError('Failed to parse line: %s' % line)
+
+                validation_set, test_set = random_split(dataset)
+
+                logging.info('Writing WIDERFACE output.')
+                for data in tqdm(dataset):
+                    split = split_label(data, validation_set, test_set)
+                    output_file.write(AUTOML_PATTERN % (split, *data))
 
 
 if __name__ == '__main__':
