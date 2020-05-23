@@ -41,7 +41,7 @@ The model is trained with [Cloud AutoML](https://cloud.google.com/automl) using 
 
 ### 1. Create the dataset
 
-There are a total of 77,881 face bounding boxes in the combined dataset. The WIDER FACE set is large and diverse, but only contains visible-light images. The thermal images from the Tufts Face Database are fewer and less diverse, so we mix the two sets before splitting them into [training, validation, and test sets](https://cloud.google.com/vision/automl/object-detection/docs/prepare). The relative size of the test and validation sets are unusually small to achieve a better balance among the source datasets while still using all available training data.
+There are a total of 197,663 face bounding boxes in the combined dataset. The WIDER FACE set is large and diverse, but only contains visible-light images. The thermal images from the Tufts Face Database are fewer and less diverse, so we mix the two sets before splitting them into [training, validation, and test sets](https://cloud.google.com/vision/automl/object-detection/docs/prepare). The relative size of the test and validation sets are unusually small to achieve a better balance among the source datasets while still using all available training data.
 
 WIDER FACE happens to come in two separate validation and training sets, which we treat as one source set. The exact breakdown is a follows:
 
@@ -49,14 +49,14 @@ WIDER FACE happens to come in two separate validation and training sets, which w
 | -: | -: | -: | -: |
 | **Tufts Face Database (IR)** | 1,247 | 155 | 155 |
 | _Fraction of source_ | ~80% | ~10% | ~10% |
-| _Fraction of combined_ | ~2% | ~20% | ~20% |
-| **WIDER FACE (Validation)** | 14,247 | 619 | 619 |
+| _Fraction of combined_ | ~1% | ~9% | ~9% |
+| **WIDER FACE (Validation)** | 35,984 | 1,564 | 1,564 |
 | _Fraction of source_ | ~92% | ~4% | ~4% |
-| _Fraction of combined_ | ~19% | ~80% | ~80% |
-| **WIDER FACE (Training)** | 60,839 | - | - |
+| _Fraction of combined_ | ~19% | ~91% | ~91% |
+| **WIDER FACE (Training)** | 156,994 | - | - |
 | _Fraction of source_ | ~100% | - | -  |
-| _Fraction of combined_ | ~80% | - | - |
-| **_Combined_** | 76,333 | 774 | 774 |
+| _Fraction of combined_ | ~81% | - | - |
+| **_Combined_** | 194,225 | 1,719 | 1,719 |
 | _Fraction of combined sources_ | ~98% | ~1% | ~1%  |
 
 #### 1.1 Get the Tufts Face Database
