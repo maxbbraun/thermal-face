@@ -1,0 +1,3 @@
+# Only include model files.
+*
+!*.tflite
