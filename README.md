@@ -89,8 +89,8 @@ gsutil -m rsync -r $TDFACE_DIR $TDFACE_BUCKET
 Create a dataset spec of the images in the [AutoML format](https://cloud.google.com/vision/automl/object-detection/docs/csv-format) using the [separately created](https://github.com/maxbbraun/tdface-annotations) bounding box annotations and upload it:
 
 ```bash
-curl -O https://raw.githubusercontent.com/maxbbraun/tdface-annotations/master/bounding-boxes.csv
-TDFACE_ANNOTATIONS="bounding-boxes.csv"
+TDFACE_ANNOTATIONS="$TDFACE_DIR/bounding-boxes.csv"
+curl https://raw.githubusercontent.com/maxbbraun/tdface-annotations/master/bounding-boxes.csv -o $TDFACE_ANNOTATIONS
 TDFACE_AUTOML="tdface-automl.csv"
 
 python3 -m venv venv
