@@ -29,7 +29,7 @@ flags.DEFINE_string('widerface_annotations', 'wider_face_bbx_gt.txt', 'The '
                     'database images.')
 flags.DEFINE_integer('max_image_size', 1024, 'The maximum size in pixels an '
                      'image can be without being distorted.')
-flags.DEFINE_integer('min_box_size', 10, 'The minimum size in pixels for a '
+flags.DEFINE_integer('min_box_size', 8, 'The minimum size in pixels for a '
                      'bounding box not to get discarded.')
 flags.DEFINE_float('validation_fraction', 0.1, 'The randomly selected '
                    'fraction of total annotations (not images) to be assigned '
@@ -94,11 +94,9 @@ def convert_bounding_box(left_str, top_str, width_str, height_str, image_width,
     # https://cloud.google.com/vision/automl/object-detection/docs/prepare
     max_width_scale = FLAGS.max_image_size / image_width
     max_height_scale = FLAGS.max_image_size / image_height
-    max_scale = min(1, min(max_width_scale, max_height_scale))
-    scaled_image_width = max_scale * image_width
-    scaled_image_height = max_scale * image_height
-    scaled_width = (right - left) * scaled_image_width
-    scaled_height = (bottom - top) * scaled_image_height
+    scale = min(1, min(max_width_scale, max_height_scale))
+    scaled_width = int((right - left) * scale)
+    scaled_height = int((bottom - top) * scale)
     if min(scaled_width, scaled_height) < FLAGS.min_box_size:
         return None
 
