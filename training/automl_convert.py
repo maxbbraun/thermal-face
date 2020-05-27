@@ -9,9 +9,9 @@ import re
 from tqdm import tqdm
 
 FLAGS = flags.FLAGS
-flags.DEFINE_enum('mode', 'TDFACE', ['TDFACE', 'WIDERFACE'], 'Whether to '
-                  'convert the Tufts Face Database or the WIDER FACE '
-                  'database.')
+flags.DEFINE_enum('mode', 'TDFACE', ['TDFACE', 'WIDERFACE', 'FLIR'], 'Whether '
+                  'to convert the Tufts Face Database, the WIDER FACE '
+                  'database, or the FLIR ADAS Dataset.')
 flags.DEFINE_string('tdface_dir', 'tufts-face-database', 'The local directory '
                     'containing the Tufts Face Database image files.')
 flags.DEFINE_string('tdface_bucket', 'gs://tufts-face-database', 'The Cloud '
@@ -52,6 +52,9 @@ FACE_PATTERN = re.compile(r'^(\d+) (\d+) (\d+) (\d+) (\d+) (\d+) (\d+) (\d+) '
 
 # The CSV pattern for the AutoML output file.
 AUTOML_PATTERN = '%s,%s,face,%.4f,%.4f,,,%.4f,%.4f,,\n'
+
+# The directory containing the normalized FLIR ADAS images.
+FLIR_NORMALIZED_DIR = 'thermal_normalized'
 
 
 def random_split(dataset):
@@ -114,26 +117,40 @@ def main(_):
     # https://cloud.google.com/vision/automl/object-detection/docs/csv-format
     with open(FLAGS.automl_out, 'w') as output_file:
 
-        if FLAGS.mode == 'TDFACE':
-            # Input format: https://github.com/maxbbraun/tdface-annotations
+        if FLAGS.mode in ['TDFACE', 'FLIR']:
+            # Input formats:
+            # https://github.com/maxbbraun/tdface-annotations
+            # https://github.com/maxbbraun/flir-adas-faces
             with open(FLAGS.tdface_annotations, newline='') as input_file:
                 reader = csv.reader(input_file)
                 next(reader)  # Skip header.
                 dataset = []
 
-                logging.info('Parsing TDFACE annotations.')
+                logging.info('Parsing %s annotations.' % FLAGS.mode)
                 for row in tqdm(reader):
-                    local_path = path.join(FLAGS.tdface_dir, *row[:3])
-                    gcs_path = path.join(FLAGS.tdface_bucket, *row[:3])
+                    if FLAGS.mode == 'TDFACE':
+                        local_path = path.join(FLAGS.tdface_dir, *row[:3])
+                        gcs_path = path.join(FLAGS.tdface_bucket, *row[:3])
+                    else:
+                        local_path = path.join(FLAGS.tdface_dir, row[0],
+                                               FLIR_NORMALIZED_DIR, row[1])
+                        gcs_path = path.join(FLAGS.tdface_bucket, row[0],
+                                             FLIR_NORMALIZED_DIR, row[1])
+
                     image = Image.open(local_path)
-                    bounding_box = convert_bounding_box(*row[3:7], image.width,
+                    if FLAGS.mode == 'TDFACE':
+                        raw_box = row[3:7]
+                    else:
+                        raw_box = row[2:6]
+                    bounding_box = convert_bounding_box(*raw_box, image.width,
                                                         image.height)
+
                     if bounding_box:
                         dataset.append((gcs_path, *bounding_box))
 
                 validation_set, test_set = random_split(dataset)
 
-                logging.info('Writing TDFACE output.')
+                logging.info('Writing %s output.' % FLAGS.mode)
                 for data in tqdm(dataset):
                     split = split_label(data, validation_set, test_set)
                     output_file.write(AUTOML_PATTERN % (split, *data))

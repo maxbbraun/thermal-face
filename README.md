@@ -37,26 +37,27 @@ You can also use the [TF Lite API](https://www.tensorflow.org/lite/guide/python)
 
 ## Training
 
-The model is trained with [Cloud AutoML](https://cloud.google.com/automl) using a face dataset that combines a large set of images in visible light from the [WIDER FACE](http://shuoyang1213.me/WIDERFACE/) database and a smaller set of thermal images from the [Tufts Face Database](http://tdface.ece.tufts.edu).
+The model is trained with [Cloud AutoML](https://cloud.google.com/automl) using a face dataset that combines a large set of images in visible light from the [WIDER FACE](http://shuoyang1213.me/WIDERFACE/) database and a smaller set of thermal images from the [Tufts Face Database](http://tdface.ece.tufts.edu) and the [FLIR ADAS Dataset](https://www.flir.com/oem/adas/adas-dataset-form/).
 
 ### 1. Create the dataset
 
-There are a total of 163,854 face bounding boxes in the combined dataset. The WIDER FACE set is large and diverse, but only contains visible-light images. The thermal images from the Tufts Face Database are fewer and less diverse, so we mix the two sets before splitting them into [training, validation, and test sets](https://cloud.google.com/vision/automl/object-detection/docs/prepare). The relative size of the test and validation sets are unusually small to achieve a better balance among the source datasets while still using all available training data.
-
-WIDER FACE happens to come in two separate validation and training sets, which we treat as one source set. The exact breakdown is a follows:
+There are a total of 164,915 face bounding boxes in the combined dataset. The WIDER FACE set is large and diverse, but only contains visible-light images. The thermal images from the Tufts Face Database and FLIR ADAS Dataset are fewer and less diverse, so we mix the three sets before splitting them into [training, validation, and test sets](https://cloud.google.com/vision/automl/object-detection/docs/prepare). The relative size of the test and validation sets are unusually small to achieve a better balance among the source datasets while still using all available training data. WIDER FACE happens to come in two separate validation and training sets, which we treat as one source set. The exact breakdown is a follows:
 
 | | Training set | Validation set | Test set |
 | -: | -: | -: | -: |
 | **Tufts Face Database (IR)** | 1,247 | 155 | 155 |
 | _Fraction of source_ | ~80% | ~10% | ~10% |
-| _Fraction of combined_ | ~1% | ~11% | ~11% |
+| _Fraction of combined_ | ~1% | ~10% | ~10% |
+| **FLIR ADAS (Faces)** | 849 | 106 | 106 |
+| _Fraction of source_ | ~80% | ~10% | ~10% |
+| _Fraction of combined_ | ~1% | ~7% | ~7% |
 | **WIDER FACE (Validation)** | 29,635 | 1,288 | 1,288 |
 | _Fraction of source_ | ~92% | ~4% | ~4% |
-| _Fraction of combined_ | ~18% | ~89% | ~89% |
+| _Fraction of combined_ | ~18% | ~83% | ~83% |
 | **WIDER FACE (Training)** | 130,086 | - | - |
 | _Fraction of source_ | ~100% | - | -  |
-| _Fraction of combined_ | ~81% | - | - |
-| **_Combined_** | 160,968 | 1,443 | 1,443 |
+| _Fraction of combined_ | ~80% | - | - |
+| **_Combined_** | 161,817 | 1,549 | 1,549 |
 | _Fraction of combined sources_ | ~98% | ~1% | ~1%  |
 
 #### 1.1 Get the Tufts Face Database
@@ -109,7 +110,57 @@ python automl_convert.py \
 gsutil cp $TDFACE_AUTOML $TDFACE_BUCKET
 ```
 
-#### 1.2 Get WIDER FACE
+#### 1.2 Get FLIR ADAS
+
+[Download](https://www.flir.com/oem/adas/adas-dataset-form/) the `FLIR_ADAS_1_3.tar.*` files and process them:
+
+```bash
+FLIR_ADAS_REPO="flir-adas-faces"
+FLIR_ADAS_DIR="flir-adas-database"
+TMP_FLIR_ADAS_DIR="/tmp/$FLIR_ADAS_DIR"
+FLIR_ADAS_BUCKET="gs://$FLIR_ADAS_DIR"
+FLIR_ADAS_ANNOTATIONS="$FLIR_ADAS_REPO/bounding-boxes.csv"
+FLIR_ADAS_AUTOML="flir-adas-automl.csv"
+
+git clone https://github.com/maxbbraun/flir-adas-faces.git $FLIR_ADAS_REPO
+cd $FLIR_ADAS_REPO
+
+mkdir $FLIR_ADAS_DIR
+tar -C $FLIR_ADAS_DIR -xvf FLIR_ADAS_1_3.tar.001 --strip-components=1
+
+python3 -m venv venv
+. venv/bin/activate
+pip install -r requirements.txt
+
+python flir_convert.py \
+  --input_dir=$FLIR_ADAS_DIR/train \
+  --output_dir=$TMP_FLIR_ADAS_DIR/train \
+  --output_csv=/dev/null
+python flir_convert.py \
+  --input_dir=$FLIR_ADAS_DIR/val \
+  --output_dir=$TMP_FLIR_ADAS_DIR/val \
+  --output_csv=/dev/null
+python flir_convert.py \
+  --input_dir=$FLIR_ADAS_DIR/video \
+  --output_dir=$TMP_FLIR_ADAS_DIR/video \
+  --output_csv=/dev/null
+
+cd ..
+. venv/bin/activate
+
+python automl_convert.py \
+  --mode=FLIR \
+  --tdface_dir=$TMP_FLIR_ADAS_DIR \
+  --tdface_bucket=$FLIR_ADAS_BUCKET \
+  --tdface_annotations=$FLIR_ADAS_ANNOTATIONS \
+  --validation_fraction=0.1 \
+  --test_fraction=0.1 \
+  --automl_out=$FLIR_ADAS_AUTOML
+
+gsutil cp $FLIR_ADAS_AUTOML $FLIR_ADAS_BUCKET
+```
+
+#### 1.3 Get WIDER FACE
 
 Download and upload the [WIDER FACE](http://shuoyang1213.me/WIDERFACE/) dataset:
  - [WIDER_train.zip](https://drive.google.com/uc?export=download&id=0B6eKvaijfFUDQUUwd21EckhUbWs)
@@ -158,7 +209,7 @@ gsutil cp $WIDERFACE_TRAINING_AUTOML $WIDERFACE_BUCKET
 gsutil cp $WIDERFACE_VALIDATION_AUTOML $WIDERFACE_BUCKET
 ```
 
-#### 1.3 Combine the datasets
+#### 1.4 Combine the datasets
 
 Combine all AutoML dataset specs into one and upload it:
 
@@ -169,6 +220,7 @@ rm -f $THERMAL_FACE_AUTOML
 cat $TDFACE_AUTOML >> $THERMAL_FACE_AUTOML
 cat $WIDERFACE_TRAINING_AUTOML >> $THERMAL_FACE_AUTOML
 cat $WIDERFACE_VALIDATION_AUTOML >> $THERMAL_FACE_AUTOML
+cat $FLIR_ADAS_AUTOML >> $THERMAL_FACE_AUTOML
 
 MODEL_BUCKET="gs://thermal-face"
 MODEL_NAME="thermal_face_automl_edge_fast"
@@ -181,7 +233,7 @@ gsutil cp $THERMAL_FACE_AUTOML $MODEL_BUCKET
 
 Use [Cloud AutoML Vision](https://cloud.google.com/vision/automl/object-detection/docs/edge-quickstart) with the following options:
 
-- New dataset name: **`tufts_face_mix_wider_face`**
+- New dataset name: **`tdface_x_widerface_x_fliradas`**
 - Model objective: **Object detection**
 - CSV file on Cloud Storage: **`$MODEL_BUCKET/$THERMAL_FACE_AUTOML`**
 - Model name: **`$MODEL_NAME`**
