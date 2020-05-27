@@ -2,6 +2,7 @@ from absl import app
 from absl import flags
 from absl import logging
 import csv
+from math import ceil
 from os import path
 from PIL import Image
 import random
@@ -29,18 +30,23 @@ flags.DEFINE_string('widerface_annotations', 'wider_face_bbx_gt.txt', 'The '
                     'database images.')
 flags.DEFINE_integer('max_image_size', 1024, 'The maximum size in pixels an '
                      'image can be without being distorted.')
-flags.DEFINE_integer('min_box_size', 8, 'The minimum size in pixels for a '
+flags.DEFINE_integer('min_box_size', 20, 'The minimum size in pixels for a '
                      'bounding box not to get discarded.')
+flags.DEFINE_float('training_fraction', 0.8, 'The randomly selected '
+                   'fraction of total annotations (not images) to be assigned '
+                   'to the training set. The sum of train_fraction, '
+                   'validation_fraction, and test_fraction may add up to less '
+                   'than 1, but not more.')
 flags.DEFINE_float('validation_fraction', 0.1, 'The randomly selected '
                    'fraction of total annotations (not images) to be assigned '
-                   'to the validation set. Anything not assigned to either '
-                   'the validation set or the test set will be assigned to '
-                   'the training set.')
+                   'to the validation set. The sum of train_fraction, '
+                   'validation_fraction, and test_fraction may add up to less '
+                   'than 1, but not more.')
 flags.DEFINE_float('test_fraction', 0.1, 'The randomly selected fraction of '
                    'total annotations (not images) to be assigned to the '
-                   'validation set. Anything not assigned to either the '
-                   'validation set or the test set will be assigned to the '
-                   'training set.')
+                   'validation set. The sum of train_fraction, '
+                   'validation_fraction, and test_fraction may add up to less '
+                   'than 1, but not more.')
 flags.DEFINE_string('automl_out', 'automl.csv', 'The output CSV file for '
                     'Cloud AutoML Vision.')
 
@@ -60,24 +66,33 @@ FLIR_NORMALIZED_DIR = 'thermal_normalized'
 def random_split(dataset):
     dataset = set(dataset)
 
-    # Translate the fractions into counts.
+    # Translate the fractions into counts and assign rounding remainders to the
+    # training set if the fractions add up to one.
+    training_count = int(FLAGS.training_fraction * len(dataset))
     validation_count = int(FLAGS.validation_fraction * len(dataset))
     test_count = int(FLAGS.test_fraction * len(dataset))
+    if (FLAGS.training_fraction + FLAGS.validation_fraction + FLAGS.test_fraction) == 1:
+        training_count += len(dataset) - training_count - validation_count - test_count
 
     # Randomly sample from the dataset and then from the remaining set.
+    training_set = set(random.sample(dataset, training_count))
+    dataset -= training_set
     validation_set = set(random.sample(dataset, validation_count))
-    test_set = set(random.sample(dataset - validation_set, test_count))
+    dataset -= validation_set
+    test_set = set(random.sample(dataset, test_count))
 
-    return validation_set, test_set
+    return training_set, validation_set, test_set
 
 
-def split_label(data, validation_set, test_set):
+def split_label(data, training_set, validation_set, test_set):
+    if data in training_set:
+        return 'TRAIN'
     if data in validation_set:
         return 'VALIDATE'
     elif data in test_set:
         return 'TEST'
     else:
-        return 'TRAIN'
+        return None
 
 
 def convert_bounding_box(left_str, top_str, width_str, height_str, image_width,
@@ -113,105 +128,114 @@ def convert_bounding_box(left_str, top_str, width_str, height_str, image_width,
 
 
 def main(_):
-    # Output format:
-    # https://cloud.google.com/vision/automl/object-detection/docs/csv-format
-    with open(FLAGS.automl_out, 'w') as output_file:
+    dataset = []
+    num_rejected = 0
 
-        if FLAGS.mode in ['TDFACE', 'FLIR']:
-            # Input formats:
-            # https://github.com/maxbbraun/tdface-annotations
-            # https://github.com/maxbbraun/flir-adas-faces
-            with open(FLAGS.tdface_annotations, newline='') as input_file:
-                reader = csv.reader(input_file)
-                next(reader)  # Skip header.
-                dataset = []
+    if FLAGS.mode in ['TDFACE', 'FLIR']:
+        # Input formats:
+        # https://github.com/maxbbraun/tdface-annotations
+        # https://github.com/maxbbraun/flir-adas-faces
+        with open(FLAGS.tdface_annotations, newline='') as input_file:
+            reader = csv.reader(input_file)
+            next(reader)  # Skip header.
 
-                logging.info('Parsing %s annotations.' % FLAGS.mode)
-                for row in tqdm(reader):
-                    if FLAGS.mode == 'TDFACE':
-                        local_path = path.join(FLAGS.tdface_dir, *row[:3])
-                        gcs_path = path.join(FLAGS.tdface_bucket, *row[:3])
-                    else:
-                        local_path = path.join(FLAGS.tdface_dir, row[0],
-                                               FLIR_NORMALIZED_DIR, row[1])
-                        gcs_path = path.join(FLAGS.tdface_bucket, row[0],
-                                             FLIR_NORMALIZED_DIR, row[1])
+            logging.info('Parsing %s annotations.' % FLAGS.mode)
+            for row in tqdm(reader):
+                if FLAGS.mode == 'TDFACE':
+                    local_path = path.join(FLAGS.tdface_dir, *row[:3])
+                    gcs_path = path.join(FLAGS.tdface_bucket, *row[:3])
+                else:
+                    local_path = path.join(FLAGS.tdface_dir, row[0],
+                                            FLIR_NORMALIZED_DIR, row[1])
+                    gcs_path = path.join(FLAGS.tdface_bucket, row[0],
+                                            FLIR_NORMALIZED_DIR, row[1])
 
+                image = Image.open(local_path)
+                if FLAGS.mode == 'TDFACE':
+                    raw_box = row[3:7]
+                else:
+                    raw_box = row[2:6]
+                bounding_box = convert_bounding_box(*raw_box, image.width,
+                                                    image.height)
+
+                if bounding_box:
+                    dataset.append((gcs_path, *bounding_box))
+                else:
+                    num_rejected += 1
+
+    elif FLAGS.mode == 'WIDERFACE':
+        # Input format: http://shuoyang1213.me/WIDERFACE/
+        with open(FLAGS.widerface_annotations) as input_file:
+
+            logging.info('Parsing WIDERFACE annotations.')
+            for count, line in tqdm(enumerate(input_file)):
+                image_filename_match = IMAGE_FILENAME_PATTERN.match(line)
+                num_faces_match = NUM_FACES_PATTERN.match(line)
+                face_pattern_match = FACE_PATTERN.match(line)
+
+                if image_filename_match:
+                    image_filename = image_filename_match.group(1)
+                    local_path = path.join(FLAGS.widerface_dir, 'images',
+                                            image_filename)
                     image = Image.open(local_path)
-                    if FLAGS.mode == 'TDFACE':
-                        raw_box = row[3:7]
-                    else:
-                        raw_box = row[2:6]
-                    bounding_box = convert_bounding_box(*raw_box, image.width,
-                                                        image.height)
+                    gcs_path = path.join(FLAGS.widerface_bucket, 'images',
+                                            image_filename)
+                    image_line_count = count
+
+                elif num_faces_match:
+                    assert count == image_line_count + 1
+                    num_faces = int(num_faces_match.group(1))
+
+                elif face_pattern_match:
+                    if not num_faces:
+                        # Empty bounding box after 0 face count.
+                        continue
+
+                    assert count <= image_line_count + 1 + num_faces
+
+                    if face_pattern_match.group(8) == '1':
+                        # Invalid bounding box.
+                        continue
+
+                    left = int(face_pattern_match.group(1))
+                    top = int(face_pattern_match.group(2))
+                    width = int(face_pattern_match.group(3))
+                    height = int(face_pattern_match.group(4))
+                    right = (left + width)
+                    bottom = (top + height)
+
+                    bounding_box = convert_bounding_box(
+                        *face_pattern_match.groups()[:4], image.width,
+                        image.height)
 
                     if bounding_box:
                         dataset.append((gcs_path, *bounding_box))
-
-                validation_set, test_set = random_split(dataset)
-
-                logging.info('Writing %s output.' % FLAGS.mode)
-                for data in tqdm(dataset):
-                    split = split_label(data, validation_set, test_set)
-                    output_file.write(AUTOML_PATTERN % (split, *data))
-
-        elif FLAGS.mode == 'WIDERFACE':
-            # Input format: http://shuoyang1213.me/WIDERFACE/
-            with open(FLAGS.widerface_annotations) as input_file:
-                dataset = []
-
-                logging.info('Parsing WIDERFACE annotations.')
-                for count, line in tqdm(enumerate(input_file)):
-                    image_filename_match = IMAGE_FILENAME_PATTERN.match(line)
-                    num_faces_match = NUM_FACES_PATTERN.match(line)
-                    face_pattern_match = FACE_PATTERN.match(line)
-
-                    if image_filename_match:
-                        image_filename = image_filename_match.group(1)
-                        local_path = path.join(FLAGS.widerface_dir, 'images',
-                                               image_filename)
-                        image = Image.open(local_path)
-                        gcs_path = path.join(FLAGS.widerface_bucket, 'images',
-                                             image_filename)
-                        image_line_count = count
-
-                    elif num_faces_match:
-                        assert count == image_line_count + 1
-                        num_faces = int(num_faces_match.group(1))
-
-                    elif face_pattern_match:
-                        if not num_faces:
-                            # Empty bounding box after 0 face count.
-                            continue
-
-                        assert count <= image_line_count + 1 + num_faces
-
-                        if face_pattern_match.group(8) == '1':
-                            # Invalid bounding box.
-                            continue
-
-                        left = int(face_pattern_match.group(1))
-                        top = int(face_pattern_match.group(2))
-                        width = int(face_pattern_match.group(3))
-                        height = int(face_pattern_match.group(4))
-                        right = (left + width)
-                        bottom = (top + height)
-
-                        bounding_box = convert_bounding_box(
-                            *face_pattern_match.groups()[:4], image.width,
-                            image.height)
-                        if bounding_box:
-                            dataset.append((gcs_path, *bounding_box))
-
                     else:
-                        raise ValueError('Failed to parse line: %s' % line)
+                        num_rejected += 1
 
-                validation_set, test_set = random_split(dataset)
+                else:
+                    raise ValueError('Failed to parse line: %s' % line)
 
-                logging.info('Writing WIDERFACE output.')
-                for data in tqdm(dataset):
-                    split = split_label(data, validation_set, test_set)
-                    output_file.write(AUTOML_PATTERN % (split, *data))
+    logging.info('Collected %d annotations and rejected %d.' % (
+        len(dataset), num_rejected))
+
+    # Split all available data into the different sets.
+    training_set, validation_set, test_set = random_split(dataset)
+    logging.info('Writing %s output.' % FLAGS.mode)
+
+    # Output format:
+    # https://cloud.google.com/vision/automl/object-detection/docs/csv-format
+    with open(FLAGS.automl_out, 'w') as output_file:
+        num_skipped = 0
+        for data in tqdm(dataset):
+            split = split_label(data, training_set, validation_set, test_set)
+            if split:
+                output_file.write(AUTOML_PATTERN % (split, *data))
+            else:
+                num_skipped += 1
+    logging.info('Wrote %d training, %d validation, and %d test annotations '
+                 'and skipped %d.' % (len(training_set), len(validation_set),
+                                      len(test_set), num_skipped))
 
 
 if __name__ == '__main__':

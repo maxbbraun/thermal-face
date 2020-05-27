@@ -41,35 +41,35 @@ The model is trained with [Cloud AutoML](https://cloud.google.com/automl) using 
 
 ### 1. Create the dataset
 
-There are a total of 164,915 face bounding boxes in the combined dataset. The WIDER FACE set is large and diverse, but only contains visible-light images. The thermal images from the Tufts Face Database and FLIR ADAS Dataset are fewer and less diverse, so we mix the three sets before splitting them into [training, validation, and test sets](https://cloud.google.com/vision/automl/object-detection/docs/prepare). The relative size of the test and validation sets are unusually small to achieve a better balance among the source datasets while still using all available training data. WIDER FACE happens to come in two separate validation and training sets, which we treat as one source set. The exact breakdown is a follows:
+There are a total of 34,035 face bounding boxes in the combined dataset. The WIDER FACE set is large and diverse, but only contains visible-light images. The thermal images from the Tufts Face Database and FLIR ADAS Dataset are fewer and less diverse, so we mix the three sets before splitting them into [training, validation, and test sets](https://cloud.google.com/vision/automl/object-detection/docs/prepare). The relative size of the test and validation sets are unusually small to achieve a better balance among the source datasets while still using a significant fraction of all available training data. The exact breakdown is a follows (fractions are rounded):
 
 | | Training set | Validation set | Test set |
 | -: | -: | -: | -: |
 | **Tufts Face Database (IR)** | 1,247 | 155 | 155 |
-| _Fraction of source_ | ~80% | ~10% | ~10% |
-| _Fraction of combined_ | ~1% | ~10% | ~10% |
-| **FLIR ADAS (Faces)** | 849 | 106 | 106 |
-| _Fraction of source_ | ~80% | ~10% | ~10% |
-| _Fraction of combined_ | ~1% | ~7% | ~7% |
-| **WIDER FACE (Validation)** | 29,635 | 1,288 | 1,288 |
-| _Fraction of source_ | ~92% | ~4% | ~4% |
-| _Fraction of combined_ | ~18% | ~83% | ~83% |
-| **WIDER FACE (Training)** | 130,086 | - | - |
-| _Fraction of source_ | ~100% | - | -  |
-| _Fraction of combined_ | ~80% | - | - |
-| **_Combined_** | 161,817 | 1,549 | 1,549 |
-| _Fraction of combined sources_ | ~98% | ~1% | ~1%  |
+| _Fraction of source_ | 80% | 10% | 10% |
+| _Fraction of combined_ | 4% | 16% | 16% |
+| **FLIR ADAS (Faces)** | 129 | 15 | 15 |
+| _Fraction of source_ | 80% | 10% | 10% |
+| _Fraction of combined_ | 0% | 2% | 2% |
+| **WIDER FACE (Validation)** | 0 | 779 | 779 |
+| _Fraction of source_ | 0% | 5% | 5% |
+| _Fraction of combined_ | 0% | 82% | 82% |
+| **WIDER FACE (Training)** | 30,761 | 0 | 0 |
+| _Fraction of source_ | 50% | 0% | 0% |
+| _Fraction of combined_ | 96% | 0% | 0% |
+| **_Combined_** | 32,137 | 949 | 949 |
+| _Fraction of combined sources_ | 94% | 3% | 3% |
 
 #### 1.1 Get the Tufts Face Database
 
 Download the thermal images from the [Tufts Face Database](http://tdface.ece.tufts.edu) and upload them to [Cloud Storage](https://cloud.google.com/storage/docs):
 
 ```bash
-cd training
-
 LOCATION="us-central1"
 TDFACE_DIR="tufts-face-database"
 TDFACE_BUCKET="gs://$TDFACE_DIR"
+
+cd training
 
 for i in $(seq 1 4)
 do
@@ -91,8 +91,12 @@ Create a dataset spec of the images in the [AutoML format](https://cloud.google.
 
 ```bash
 TDFACE_ANNOTATIONS="$TDFACE_DIR/bounding-boxes.csv"
-curl https://raw.githubusercontent.com/maxbbraun/tdface-annotations/master/bounding-boxes.csv -o $TDFACE_ANNOTATIONS
 TDFACE_AUTOML="tdface-automl.csv"
+TDFACE_TRAINING_FRACTION=0.8
+TDFACE_VALIDATION_FRACTION=0.1
+TDFACE_TEST_FRACTION=0.1
+
+curl https://raw.githubusercontent.com/maxbbraun/tdface-annotations/master/bounding-boxes.csv -o $TDFACE_ANNOTATIONS
 
 python3 -m venv venv
 . venv/bin/activate
@@ -103,8 +107,9 @@ python automl_convert.py \
   --tdface_dir=$TDFACE_DIR \
   --tdface_bucket=$TDFACE_BUCKET \
   --tdface_annotations=$TDFACE_ANNOTATIONS \
-  --validation_fraction=0.1 \
-  --test_fraction=0.1 \
+  --training_fraction=$TDFACE_TRAINING_FRACTION \
+  --validation_fraction=$TDFACE_VALIDATION_FRACTION \
+  --test_fraction=$TDFACE_TEST_FRACTION \
   --automl_out=$TDFACE_AUTOML
 
 gsutil cp $TDFACE_AUTOML $TDFACE_BUCKET
@@ -121,6 +126,9 @@ TMP_FLIR_ADAS_DIR="/tmp/$FLIR_ADAS_DIR"
 FLIR_ADAS_BUCKET="gs://$FLIR_ADAS_DIR"
 FLIR_ADAS_ANNOTATIONS="$FLIR_ADAS_REPO/bounding-boxes.csv"
 FLIR_ADAS_AUTOML="flir-adas-automl.csv"
+FLIR_ADAS_TRAINING_FRACTION=0.8
+FLIR_ADAS_VALIDATION_FRACTION=0.1
+FLIR_ADAS_TEST_FRACTION=0.1
 
 git clone https://github.com/maxbbraun/flir-adas-faces.git $FLIR_ADAS_REPO
 cd $FLIR_ADAS_REPO
@@ -153,8 +161,9 @@ python automl_convert.py \
   --tdface_dir=$TMP_FLIR_ADAS_DIR \
   --tdface_bucket=$FLIR_ADAS_BUCKET \
   --tdface_annotations=$FLIR_ADAS_ANNOTATIONS \
-  --validation_fraction=0.1 \
-  --test_fraction=0.1 \
+  --training_fraction=$FLIR_ADAS_TRAINING_FRACTION \
+  --validation_fraction=$FLIR_ADAS_VALIDATION_FRACTION \
+  --test_fraction=$FLIR_ADAS_TEST_FRACTION \
   --automl_out=$FLIR_ADAS_AUTOML
 
 gsutil cp $FLIR_ADAS_AUTOML $FLIR_ADAS_BUCKET
@@ -187,22 +196,30 @@ gsutil -m rsync -r $WIDERFACE_DIR $WIDERFACE_BUCKET
 ```bash
 WIDERFACE_TRAINING_AUTOML="widerface-training-automl.csv"
 WIDERFACE_VALIDATION_AUTOML="widerface-validation-automl.csv"
+WIDERFACE_TRAINING_TRAINING_FRACTION=0.5
+WIDERFACE_TRAINING_VALIDATION_FRACTION=0
+WIDERFACE_TRAINING_TEST_FRACTION=0
+WIDERFACE_VALIDATION_TRAINING_FRACTION=0
+WIDERFACE_VALIDATION_VALIDATION_FRACTION=0.05
+WIDERFACE_VALIDATION_TEST_FRACTION=0.05
 
 python automl_convert.py \
   --mode=WIDERFACE \
   --widerface_dir=$WIDERFACE_DIR/WIDER_train \
   --widerface_bucket=$WIDERFACE_BUCKET/WIDER_train \
   --widerface_annotations=$WIDERFACE_DIR/wider_face_split/wider_face_train_bbx_gt.txt \
-  --validation_fraction=0 \
-  --test_fraction=0 \
+  --training_fraction=$WIDERFACE_TRAINING_TRAINING_FRACTION \
+  --validation_fraction=$WIDERFACE_TRAINING_VALIDATION_FRACTION \
+  --test_fraction=$WIDERFACE_TRAINING_TEST_FRACTION \
   --automl_out=$WIDERFACE_TRAINING_AUTOML
 python automl_convert.py \
   --mode=WIDERFACE \
   --widerface_dir=$WIDERFACE_DIR/WIDER_val \
   --widerface_bucket=$WIDERFACE_BUCKET/WIDER_val \
   --widerface_annotations=$WIDERFACE_DIR/wider_face_split/wider_face_val_bbx_gt.txt \
-  --validation_fraction=0.04 \
-  --test_fraction=0.04 \
+  --training_fraction=$WIDERFACE_VALIDATION_TRAINING_FRACTION \
+  --validation_fraction=$WIDERFACE_VALIDATION_VALIDATION_FRACTION \
+  --test_fraction=$WIDERFACE_VALIDATION_TEST_FRACTION \
   --automl_out=$WIDERFACE_VALIDATION_AUTOML
 
 gsutil cp $WIDERFACE_TRAINING_AUTOML $WIDERFACE_BUCKET
@@ -215,15 +232,14 @@ Combine all AutoML dataset specs into one and upload it:
 
 ```bash
 THERMAL_FACE_AUTOML="automl.csv"
+MODEL_BUCKET="gs://thermal-face"
+MODEL_NAME="thermal_face_automl_edge_fast"
 
 rm -f $THERMAL_FACE_AUTOML
 cat $TDFACE_AUTOML >> $THERMAL_FACE_AUTOML
 cat $WIDERFACE_TRAINING_AUTOML >> $THERMAL_FACE_AUTOML
 cat $WIDERFACE_VALIDATION_AUTOML >> $THERMAL_FACE_AUTOML
 cat $FLIR_ADAS_AUTOML >> $THERMAL_FACE_AUTOML
-
-MODEL_BUCKET="gs://thermal-face"
-MODEL_NAME="thermal_face_automl_edge_fast"
 
 gsutil mb -l $LOCATION $MODEL_BUCKET
 gsutil cp $THERMAL_FACE_AUTOML $MODEL_BUCKET
