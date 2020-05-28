@@ -2,6 +2,7 @@ from absl import app
 from absl import flags
 from absl import logging
 import csv
+from itertools import chain
 from math import ceil
 from os import path
 from PIL import Image
@@ -33,20 +34,17 @@ flags.DEFINE_integer('max_image_size', 1024, 'The maximum size in pixels an '
 flags.DEFINE_integer('min_box_size', 20, 'The minimum size in pixels for a '
                      'bounding box not to get discarded.')
 flags.DEFINE_float('training_fraction', 0.8, 'The randomly selected '
-                   'fraction of total annotations (not images) to be assigned '
-                   'to the training set. The sum of train_fraction, '
-                   'validation_fraction, and test_fraction may add up to less '
-                   'than 1, but not more.')
+                   'fraction of total images to be assigned to the training '
+                   'set. The sum of train_fraction, validation_fraction, and '
+                   'test_fraction may add up to less than 1, but not more.')
 flags.DEFINE_float('validation_fraction', 0.1, 'The randomly selected '
-                   'fraction of total annotations (not images) to be assigned '
-                   'to the validation set. The sum of train_fraction, '
-                   'validation_fraction, and test_fraction may add up to less '
-                   'than 1, but not more.')
+                   'fraction of total images to be assigned to the validation '
+                   'set. The sum of train_fraction, validation_fraction, and '
+                   'test_fraction may add up to less than 1, but not more.')
 flags.DEFINE_float('test_fraction', 0.1, 'The randomly selected fraction of '
-                   'total annotations (not images) to be assigned to the '
-                   'validation set. The sum of train_fraction, '
-                   'validation_fraction, and test_fraction may add up to less '
-                   'than 1, but not more.')
+                   'total images to be assigned to the test set. The sum of '
+                   'train_fraction, validation_fraction, and test_fraction '
+                   'may add up to less than 1, but not more.')
 flags.DEFINE_string('automl_out', 'automl.csv', 'The output CSV file for '
                     'Cloud AutoML Vision.')
 
@@ -63,33 +61,43 @@ AUTOML_PATTERN = '%s,%s,face,%.4f,%.4f,,,%.4f,%.4f,,\n'
 FLIR_NORMALIZED_DIR = 'thermal_normalized'
 
 
+def dataset_add(dataset, image, bounding_box):
+    if image in dataset:
+        dataset[image].append(bounding_box)
+    else:
+        dataset[image] = [bounding_box]
+
+
 def random_split(dataset):
-    dataset = set(dataset)
+    # Split by images, not annotations.
+    images = set(dataset.keys())
 
     # Translate the fractions into counts and assign rounding remainders to the
     # training set if the fractions add up to one.
-    training_count = int(FLAGS.training_fraction * len(dataset))
-    validation_count = int(FLAGS.validation_fraction * len(dataset))
-    test_count = int(FLAGS.test_fraction * len(dataset))
-    if (FLAGS.training_fraction + FLAGS.validation_fraction + FLAGS.test_fraction) == 1:
-        training_count += len(dataset) - training_count - validation_count - test_count
+    training_count = int(FLAGS.training_fraction * len(images))
+    validation_count = int(FLAGS.validation_fraction * len(images))
+    test_count = int(FLAGS.test_fraction * len(images))
+    if sum([FLAGS.training_fraction, FLAGS.validation_fraction,
+            FLAGS.test_fraction]) == 1:
+        training_count += len(images) - sum([training_count, validation_count,
+                                             test_count])
 
-    # Randomly sample from the dataset and then from the remaining set.
-    training_set = set(random.sample(dataset, training_count))
-    dataset -= training_set
-    validation_set = set(random.sample(dataset, validation_count))
-    dataset -= validation_set
-    test_set = set(random.sample(dataset, test_count))
+    # Randomly sample from the images and then from the remaining set.
+    training_set = set(random.sample(images, training_count))
+    images -= training_set
+    validation_set = set(random.sample(images, validation_count))
+    images -= validation_set
+    test_set = set(random.sample(images, test_count))
 
     return training_set, validation_set, test_set
 
 
-def split_label(data, training_set, validation_set, test_set):
-    if data in training_set:
+def split_label(image, training_set, validation_set, test_set):
+    if image in training_set:
         return 'TRAIN'
-    if data in validation_set:
+    if image in validation_set:
         return 'VALIDATE'
-    elif data in test_set:
+    elif image in test_set:
         return 'TEST'
     else:
         return None
@@ -127,8 +135,14 @@ def convert_bounding_box(left_str, top_str, width_str, height_str, image_width,
     return relative_left, relative_top, relative_right, relative_bottom
 
 
+def count_annotations(dataset, split):
+    subset = filter(lambda x: x[0] in split, dataset.items())
+    annotations = map(lambda x: x[1], subset)
+    return sum(1 for x in chain(*annotations))
+
+
 def main(_):
-    dataset = []
+    dataset = {}
     num_rejected = 0
 
     if FLAGS.mode in ['TDFACE', 'FLIR']:
@@ -146,9 +160,9 @@ def main(_):
                     gcs_path = path.join(FLAGS.tdface_bucket, *row[:3])
                 else:
                     local_path = path.join(FLAGS.tdface_dir, row[0],
-                                            FLIR_NORMALIZED_DIR, row[1])
+                                           FLIR_NORMALIZED_DIR, row[1])
                     gcs_path = path.join(FLAGS.tdface_bucket, row[0],
-                                            FLIR_NORMALIZED_DIR, row[1])
+                                         FLIR_NORMALIZED_DIR, row[1])
 
                 image = Image.open(local_path)
                 if FLAGS.mode == 'TDFACE':
@@ -159,7 +173,7 @@ def main(_):
                                                     image.height)
 
                 if bounding_box:
-                    dataset.append((gcs_path, *bounding_box))
+                    dataset_add(dataset, gcs_path, bounding_box)
                 else:
                     num_rejected += 1
 
@@ -176,10 +190,10 @@ def main(_):
                 if image_filename_match:
                     image_filename = image_filename_match.group(1)
                     local_path = path.join(FLAGS.widerface_dir, 'images',
-                                            image_filename)
+                                           image_filename)
                     image = Image.open(local_path)
                     gcs_path = path.join(FLAGS.widerface_bucket, 'images',
-                                            image_filename)
+                                         image_filename)
                     image_line_count = count
 
                 elif num_faces_match:
@@ -209,15 +223,15 @@ def main(_):
                         image.height)
 
                     if bounding_box:
-                        dataset.append((gcs_path, *bounding_box))
+                        dataset_add(dataset, gcs_path, bounding_box)
                     else:
                         num_rejected += 1
 
                 else:
                     raise ValueError('Failed to parse line: %s' % line)
 
-    logging.info('Collected %d annotations and rejected %d.' % (
-        len(dataset), num_rejected))
+    logging.info('Collected %d images with %d annotations and rejected %d.' % (
+        len(dataset), sum(1 for x in chain(*dataset.values())), num_rejected))
 
     # Split all available data into the different sets.
     training_set, validation_set, test_set = random_split(dataset)
@@ -226,16 +240,30 @@ def main(_):
     # Output format:
     # https://cloud.google.com/vision/automl/object-detection/docs/csv-format
     with open(FLAGS.automl_out, 'w') as output_file:
-        num_skipped = 0
-        for data in tqdm(dataset):
-            split = split_label(data, training_set, validation_set, test_set)
-            if split:
-                output_file.write(AUTOML_PATTERN % (split, *data))
-            else:
-                num_skipped += 1
-    logging.info('Wrote %d training, %d validation, and %d test annotations '
-                 'and skipped %d.' % (len(training_set), len(validation_set),
-                                      len(test_set), num_skipped))
+        num_skipped_images = 0
+        num_skipped_annotations = 0
+
+        for image, bounding_boxes in tqdm(dataset.items()):
+            label = split_label(image, training_set, validation_set, test_set)
+            if not label:
+                num_skipped_images += 1
+                num_skipped_annotations += len(bounding_boxes)
+                continue
+
+            for bounding_box in bounding_boxes:
+                output_file.write(AUTOML_PATTERN % (label, image,
+                                                    *bounding_box))
+
+    logging.info('Wrote training (%d/%d), validation (%d/%d), and test '
+                 '(%d/%d) sets and skipped %d/%d images/annotations.' % (
+                     len(training_set),
+                     count_annotations(dataset, training_set),
+                     len(validation_set),
+                     count_annotations(dataset, validation_set),
+                     len(test_set),
+                     count_annotations(dataset, test_set),
+                     num_skipped_images,
+                     num_skipped_annotations))
 
 
 if __name__ == '__main__':

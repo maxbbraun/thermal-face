@@ -41,24 +41,24 @@ The model is trained with [Cloud AutoML](https://cloud.google.com/automl) using 
 
 ### 1. Create the dataset
 
-There are a total of 34,035 face bounding boxes in the combined dataset. The WIDER FACE set is large and diverse, but only contains visible-light images. The thermal images from the Tufts Face Database and FLIR ADAS Dataset are fewer and less diverse, so we mix the three sets before splitting them into [training, validation, and test sets](https://cloud.google.com/vision/automl/object-detection/docs/prepare). The relative size of the test and validation sets are unusually small to achieve a better balance among the source datasets while still using a significant fraction of all available training data. The exact breakdown is a follows (fractions are rounded):
+There are a total of 8,197 images and 35,274 face bounding box annotations in the combined dataset. The WIDER FACE set is large and diverse, but only contains visible-light images. The thermal images from the Tufts Face Database and FLIR ADAS Dataset are fewer and less diverse, so we mix the three sets before splitting them into [training, validation, and test sets](https://cloud.google.com/vision/automl/object-detection/docs/prepare). The relative size of the test and validation sets are unusually small to achieve a better balance among the source datasets while still using a significant fraction of all available training data. The exact breakdown of images (and annotations) is as follows:
 
 | | Training set | Validation set | Test set |
 | -: | -: | -: | -: |
-| **Tufts Face Database (IR)** | 1,247 | 155 | 155 |
-| _Fraction of source_ | 80% | 10% | 10% |
-| _Fraction of combined_ | 4% | 16% | 16% |
-| **FLIR ADAS (Faces)** | 129 | 15 | 15 |
-| _Fraction of source_ | 80% | 10% | 10% |
-| _Fraction of combined_ | 0% | 2% | 2% |
-| **WIDER FACE (Validation)** | 0 | 779 | 779 |
-| _Fraction of source_ | 0% | 5% | 5% |
-| _Fraction of combined_ | 0% | 82% | 82% |
-| **WIDER FACE (Training)** | 30,761 | 0 | 0 |
-| _Fraction of source_ | 50% | 0% | 0% |
-| _Fraction of combined_ | 96% | 0% | 0% |
-| **_Combined_** | 32,137 | 949 | 949 |
-| _Fraction of combined sources_ | 94% | 3% | 3% |
+| **Tufts Face Database (IR)** | 1,247 (1,247) | 155 (155) | 155 (155) |
+| _Fraction of source images_ | 80% | 10% | 10% |
+| _Fraction of combined_ | 17% (4%) | 48% (15%) | 48% (16%) |
+| **FLIR ADAS (Faces)** | 113 (129) | 13 (15) | 13 (15) |
+| _Fraction of source images_ | 80% | 10% | 10% |
+| _Fraction of combined_ | 1% (0%) | 4% (1%) | 4% (2%) |
+| **WIDER FACE (Validation)** | 0 (0) | 154 (881) | 154 (804) |
+| _Fraction of source images_ | 0% | 5% | 5% |
+| _Fraction of combined_ | 0% (0%) | 48% (84%) | 48% (83%) |
+| **WIDER FACE (Training)** | 6,193 (31,873) | 0 (0) | 0 (0) |
+| _Fraction of source images_ | 50% | 0% | 0% |
+| _Fraction of combined_ | 82% (96%) | 0% (0%) | 0% (0%) |
+| **_Combined_** | 7,553 (33,249) | 322 (1,051) | 322 (974) |
+| _Fraction of combined sources_ | 92% (94%) | 4% (3%) | 4% (3%) |
 
 #### 1.1 Get the Tufts Face Database
 
@@ -235,13 +235,14 @@ THERMAL_FACE_AUTOML="automl.csv"
 MODEL_BUCKET="gs://thermal-face"
 MODEL_NAME="thermal_face_automl_edge_fast"
 
+gsutil mb -l $LOCATION $MODEL_BUCKET
+
 rm -f $THERMAL_FACE_AUTOML
 cat $TDFACE_AUTOML >> $THERMAL_FACE_AUTOML
 cat $WIDERFACE_TRAINING_AUTOML >> $THERMAL_FACE_AUTOML
 cat $WIDERFACE_VALIDATION_AUTOML >> $THERMAL_FACE_AUTOML
 cat $FLIR_ADAS_AUTOML >> $THERMAL_FACE_AUTOML
 
-gsutil mb -l $LOCATION $MODEL_BUCKET
 gsutil cp $THERMAL_FACE_AUTOML $MODEL_BUCKET
 ```
 
