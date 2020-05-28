@@ -41,24 +41,24 @@ The model is trained with [Cloud AutoML](https://cloud.google.com/automl) using 
 
 ### 1. Create the dataset
 
-There are a total of 8,197 images and 35,274 face bounding box annotations in the combined dataset. The WIDER FACE set is large and diverse, but only contains visible-light images. The thermal images from the Tufts Face Database and FLIR ADAS Dataset are fewer and less diverse, so we mix the three sets before splitting them into [training, validation, and test sets](https://cloud.google.com/vision/automl/object-detection/docs/prepare). The relative size of the test and validation sets are unusually small to achieve a better balance among the source datasets while still using a significant fraction of all available training data. The exact breakdown of images (and annotations) is as follows:
+There are a total of 8,852 images and 59,288 face bounding box annotations in the combined dataset. The WIDER FACE set is large and diverse, but only contains visible-light images. The thermal images from the Tufts Face Database and FLIR ADAS Dataset are fewer and less diverse, so we mix the three sets before splitting them into [training, validation, and test sets](https://cloud.google.com/vision/automl/object-detection/docs/prepare). The relative size of the test and validation sets are unusually small to achieve a better balance among the source datasets while still using a significant fraction of all available training data. The exact breakdown of images (and annotations) is as follows:
 
 | | Training set | Validation set | Test set |
 | -: | -: | -: | -: |
 | **Tufts Face Database (IR)** | 1,247 (1,247) | 155 (155) | 155 (155) |
 | _Fraction of source images_ | 80% | 10% | 10% |
-| _Fraction of combined_ | 17% (4%) | 48% (15%) | 48% (16%) |
-| **FLIR ADAS (Faces)** | 113 (129) | 13 (15) | 13 (15) |
+| _Fraction of combined_ | 15% (2%) | 42% (10%) | 42% (12%) |
+| **FLIR ADAS (Faces)** | 440 (580) | 54 (74) | 54 (74) |
 | _Fraction of source images_ | 80% | 10% | 10% |
-| _Fraction of combined_ | 1% (0%) | 4% (1%) | 4% (2%) |
-| **WIDER FACE (Validation)** | 0 (0) | 154 (881) | 154 (804) |
+| _Fraction of combined_ | 5% (1%) | 15% (5%) | 15% (6%) |
+| **WIDER FACE (Validation)** | 0 (0) | 160 (1,350) | 160 (1,022) |
 | _Fraction of source images_ | 0% | 5% | 5% |
-| _Fraction of combined_ | 0% (0%) | 48% (84%) | 48% (83%) |
-| **WIDER FACE (Training)** | 6,193 (31,873) | 0 (0) | 0 (0) |
+| _Fraction of combined_ | 0% (0%) | 43% (85%) | 43% (82%) |
+| **WIDER FACE (Training)** | 6,427 (54,631) | 0 (0) | 0 (0) |
 | _Fraction of source images_ | 50% | 0% | 0% |
-| _Fraction of combined_ | 82% (96%) | 0% (0%) | 0% (0%) |
-| **_Combined_** | 7,553 (33,249) | 322 (1,051) | 322 (974) |
-| _Fraction of combined sources_ | 92% (94%) | 4% (3%) | 4% (3%) |
+| _Fraction of combined_ | 79% (97%) | 0% (0%) | 0% (0%) |
+| **_Combined_** | 8,114 (56,458) | 369 (1,579) | 369 (1,251) |
+| _Fraction of combined sources_ | 92% (95%) | 4% (3%) | 4% (3%) |
 
 #### 1.1 Get the Tufts Face Database
 
