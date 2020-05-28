@@ -275,12 +275,12 @@ OUT_DIR="/out"
 gsutil cp $MODEL_BUCKET/**/*$MODEL_NAME*/model.tflite $MODEL_FILE
 
 docker build . \
-  --file $COMPILER_NAME.Dockerfile \
-  --tag $COMPILER_NAME \
-  --build-arg MODEL_FILE=$MODEL_FILE \
-  --build-arg OUT_DIR=$OUT_DIR
+  --file=$COMPILER_NAME.Dockerfile \
+  --tag=$COMPILER_NAME \
+  --build-arg=MODEL_FILE=$MODEL_FILE \
+  --build-arg=OUT_DIR=$OUT_DIR
 docker run \
-  --mount type=bind,source=$MODEL_DIR,target=$OUT_DIR \
+  --mount=type=bind,source=$MODEL_DIR,target=$OUT_DIR \
   --rm \
   $COMPILER_NAME
 mv $MODEL_FILE $MODEL_DIR/
