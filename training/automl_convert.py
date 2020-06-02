@@ -31,8 +31,8 @@ flags.DEFINE_string('widerface_annotations', 'wider_face_bbx_gt.txt', 'The '
                     'database images.')
 flags.DEFINE_integer('max_image_size', 1024, 'The maximum size in pixels an '
                      'image can be without being distorted.')
-flags.DEFINE_integer('min_box_size', 10, 'The minimum size in pixels for a '
-                     'bounding box not to get discarded.')
+flags.DEFINE_integer('min_box_size', 8, 'The minimum width and height in '
+                     'pixels for a bounding box to not get discarded.')
 flags.DEFINE_float('training_fraction', 0.8, 'The randomly selected '
                    'fraction of total images to be assigned to the training '
                    'set. The sum of train_fraction, validation_fraction, and '
