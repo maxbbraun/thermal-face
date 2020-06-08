@@ -41,24 +41,24 @@ The model is trained with [Cloud AutoML](https://cloud.google.com/automl) using 
 
 ### 1. Create the dataset
 
-There are a total of 9,085 images and 73,158 face bounding box annotations in the combined dataset. The WIDER FACE set is large and diverse, but only contains visible-light images. The thermal images from the Tufts Face Database and FLIR ADAS Dataset are fewer and less diverse, so we mix the three sets before splitting them into [training, validation, and test sets](https://cloud.google.com/vision/automl/object-detection/docs/prepare). The relative size of the test and validation sets are unusually small to achieve a better balance among the source datasets while still using a significant fraction of all available training data. The exact breakdown of images (and annotations) is as follows:
+There are a total of 18,418 images and 164,915 face bounding box annotations in the combined dataset. The WIDER FACE set is large and diverse, but only contains visible-light images. The thermal images from the Tufts Face Database and FLIR ADAS Dataset are fewer and less diverse, so we mix the three sets before splitting them into [training, validation, and test sets](https://cloud.google.com/vision/automl/object-detection/docs/prepare). The relative size of the test and validation sets are unusually small to achieve a better balance among the source datasets while still using a significant fraction of all available training data. The exact breakdown of images (and annotations) is as follows:
 
 | | Training set | Validation set | Test set |
 | -: | -: | -: | -: |
 | **Tufts Face Database (IR)** | 1,247 (1,247) | 155 (155) | 155 (155) |
 | _Fraction of source images_ | 80% | 10% | 10% |
-| _Fraction of combined_ | 15% (2%) | 39% (7%) | 39% (9%) |
-| **FLIR ADAS (Faces)** | 617 (855) | 77 (101) | 77 (105) |
+| _Fraction of combined_ | 7% (1%) | 39% (8%) | 39% (8%) |
+| **FLIR ADAS (Faces)** | 617 (854) | 77 (108) | 77 (99) |
 | _Fraction of source images_ | 80% | 10% | 10% |
-| _Fraction of combined_ | 7% (1%) | 20% (5%) | 20% (6%) |
-| **WIDER FACE (Validation)** | 0 (0) | 161 (1,890) | 161 (1,528) |
-| _Fraction of source images_ | 0% | 5% | 5% |
-| _Fraction of combined_ | 0% (0%) | 41% (88%) | 41% (85%) |
-| **WIDER FACE (Training)** | 6,435 (67,122) | 0 (0) | 0 (0) |
-| _Fraction of source images_ | 50% | 0% | 0% |
-| _Fraction of combined_ | 78% (97%) | 0% (0%) | 0% (0%) |
-| **_Combined_** | 8,299 (69,224) | 393 (2,146) | 393 (1,788) |
-| _Fraction of combined sources_ | 91% (95%) | 4% (3%) | 4% (3%) |
+| _Fraction of combined_ | 3% (1%) | 20% (6%) | 20% (5%) |
+| **WIDER FACE (Validation)** | 2,898 (28,859) | 161 (1,611) | 161 (1,741) |
+| _Fraction of source images_ | 90% | 5% | 5% |
+| _Fraction of combined_ | 16% (18%) | 41% (86%) | 41% (87%) |
+| **WIDER FACE (Training)** | 12,870 (130,086) | 0 (0) | 0 (0) |
+| _Fraction of source images_ | 100% | 0% | 0% |
+| _Fraction of combined_ | 73% (81%) | 0% (0%) | 0% (0%) |
+| **_Combined_** | 17,632 (161,046) | 393 (1,874) | 393 (1,995) |
+| _Fraction of combined sources_ | 96% (98%) | 2% (1%) | 2% (1%) |
 
 #### 1.1 Get the Tufts Face Database
 
@@ -196,10 +196,10 @@ gsutil -m rsync -r $WIDERFACE_DIR $WIDERFACE_BUCKET
 ```bash
 WIDERFACE_TRAINING_AUTOML="widerface-training-automl.csv"
 WIDERFACE_VALIDATION_AUTOML="widerface-validation-automl.csv"
-WIDERFACE_TRAINING_TRAINING_FRACTION=0.5
-WIDERFACE_TRAINING_VALIDATION_FRACTION=0
-WIDERFACE_TRAINING_TEST_FRACTION=0
-WIDERFACE_VALIDATION_TRAINING_FRACTION=0
+WIDERFACE_TRAINING_TRAINING_FRACTION=1.0
+WIDERFACE_TRAINING_VALIDATION_FRACTION=0.0
+WIDERFACE_TRAINING_TEST_FRACTION=0.0
+WIDERFACE_VALIDATION_TRAINING_FRACTION=0.9
 WIDERFACE_VALIDATION_VALIDATION_FRACTION=0.05
 WIDERFACE_VALIDATION_TEST_FRACTION=0.05
 
