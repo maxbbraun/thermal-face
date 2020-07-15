@@ -262,8 +262,6 @@ Use [Cloud AutoML Vision](https://cloud.google.com/vision/automl/object-detectio
 
 ### 3. Compile the model
 
-⚠️ ***See [open issue](https://github.com/maxbbraun/thermal-face/issues/2).***
-
 Use [Docker](https://docs.docker.com) to compile the model for [Edge TPU](https://coral.ai/products/):
 
 ```bash
