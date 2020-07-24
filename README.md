@@ -6,7 +6,7 @@
 
 The face detection model is using [TensorFlow Lite](https://www.tensorflow.org/lite) for optimal performance on mobile/edge devices. The recommended inference setup is a [Raspberry Pi 4 Model B](https://www.raspberrypi.org/products/raspberry-pi-4-model-b/) with a [Coral USB Accelerator](https://coral.ai/docs/accelerator/get-started/).
 
-The following is an example for inference from Python on an image file using the compiled model [`thermal_face_automl_edge_fast_edgetpu.tflite`](models/thermal_face_automl_edge_fast_edgetpu.tflite) and the [Edge TPU API](https://coral.ai/docs/edgetpu/api-intro/):
+The following is an example for inference from Python on an image file using the compiled model `thermal_face_automl_edge_fast_edgetpu.tflite`, downloaded from the latest [release](https://github.com/maxbbraun/thermal-face/releases), and the [Edge TPU API](https://coral.ai/docs/edgetpu/api-intro/):
 
 ```bash
 pip3 install Pillow
@@ -30,10 +30,10 @@ faces = face_detector.detect_with_image(image,
     resample=Image.BILINEAR)
 for face in faces:
   # np.array([[left, top], [right, bottom]], dtype=float64)
-  face.bounding_box
+  print(face.bounding_box)
 ```
 
-You can also use the [TF Lite API](https://www.tensorflow.org/lite/guide/python) directly on the compiled model or, in the absence of a Edge TPU, on the uncompiled model [`thermal_face_automl_edge_fast.tflite`](models/thermal_face_automl_edge_fast.tflite).
+Alternatively, you can use the [TF Lite API](https://www.tensorflow.org/lite/guide/python) directly on the compiled model or, in the absence of an Edge TPU, on the uncompiled model `thermal_face_automl_edge_fast.tflite`, which is also in the latest [release](https://github.com/maxbbraun/thermal-face/releases).
 
 ## Training
 
