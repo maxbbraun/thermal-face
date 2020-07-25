@@ -96,7 +96,7 @@ TDFACE_TRAINING_FRACTION=0.8
 TDFACE_VALIDATION_FRACTION=0.1
 TDFACE_TEST_FRACTION=0.1
 
-curl https://raw.githubusercontent.com/maxbbraun/tdface-annotations/master/bounding-boxes.csv -o $TDFACE_ANNOTATIONS
+curl https://github.com/maxbbraun/tdface-annotations/releases/latest/download/bounding-boxes.csv -o $TDFACE_ANNOTATIONS
 
 python3 -m venv venv
 . venv/bin/activate
@@ -117,7 +117,7 @@ gsutil cp $TDFACE_AUTOML $TDFACE_BUCKET
 
 #### 1.2 Get FLIR ADAS
 
-[Download](https://www.flir.com/oem/adas/adas-dataset-form/) the `FLIR_ADAS_1_3.tar.*` files and process them:
+[Download](https://www.flir.com/oem/adas/adas-dataset-form/) the `FLIR_ADAS_1_3.tar.*` files and [separately created](https://github.com/maxbbraun/flir-adas-faces) bounding box annotations and process them:
 
 ```bash
 FLIR_ADAS_REPO="flir-adas-faces"
@@ -132,6 +132,8 @@ FLIR_ADAS_TEST_FRACTION=0.1
 
 git clone https://github.com/maxbbraun/flir-adas-faces.git $FLIR_ADAS_REPO
 cd $FLIR_ADAS_REPO
+
+curl https://github.com/maxbbraun/flir-adas-faces/releases/latest/download/bounding-boxes.csv -o $FLIR_ADAS_ANNOTATIONS
 
 mkdir $FLIR_ADAS_DIR
 tar -C $FLIR_ADAS_DIR -xvf FLIR_ADAS_1_3.tar.001 --strip-components=1
