@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+authors:
+- family-names: "Braun"
+  given-names: "Max"
+title: "Thermal Face"
+version: 1.0
+date-released: 2020-07-24
+url: "https://github.com/maxbbraun/thermal-face"
